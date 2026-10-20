@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.crambeary.journalsync.JournalTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:43:11.760Z" hostname="bagend" time="0.386">
+  <testcase name="generatedMarkerlessNotesPaginateLosslesslyAndBecomeStable()" classname="com.crambeary.journalsync.JournalTest" time="0.292" />
+  <testcase name="overCapLoadIsReportedAndLeavesBytesAndModifiedTimeUnchanged()" classname="com.crambeary.journalsync.JournalTest" time="0.002" />
+  <testcase name="frontmatterAndTrailingNewlinesRoundTripUntouched()" classname="com.crambeary.journalsync.JournalTest" time="0.003" />
+  <testcase name="loadOfAnUnreadablePathFails()" classname="com.crambeary.journalsync.JournalTest" time="0.002" />
+  <testcase name="saveWritesPagesJoinedByMarkerLines()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="exactPageAndCountLimitsAreAcceptedByRealBook()" classname="com.crambeary.journalsync.JournalTest" time="0.004" />
+  <testcase name="loadedPagesFitTheRealBookComponent()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="savingToAnUnwritablePathReportsFailureInsteadOfThrowing()" classname="com.crambeary.journalsync.JournalTest" time="0.002" />
+  <testcase name="loadOfAFileWithoutMarkersIsASingleKnownPage()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="oversizedPageSaveRefusesInsteadOfWritingInvalidBookText()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="veryLongLinesAndSurrogateBoundaryPaginateWithoutLosingCharacters()" classname="com.crambeary.journalsync.JournalTest" time="0.002" />
+  <testcase name="oversizedExplicitPagesArePaginatedAndEmptyPagesPreserved()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="loadTokenCarriesTheSha256OfTheFileBytes()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="generatedMarkedNotesRoundTripThroughRealBookUnchanged()" classname="com.crambeary.journalsync.JournalTest" time="0.05" />
+  <testcase name="loadOfAMissingFileIsAnEmptyJournalWithAnAbsentToken()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="savingToAMissingFileCreatesItAndItsFolder()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="loadSplitsTheFileIntoPagesAtMarkerLines()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="autoPaginationAlsoRefusesOverCapRatherThanTruncating()" classname="com.crambeary.journalsync.JournalTest" time="0.004" />
+  <testcase name="malformedUtf8IsRefusedRatherThanSilentlyReplaced()" classname="com.crambeary.journalsync.JournalTest" time="0.002" />
+  <testcase name="aMultiPageNoteSavesBackUnchanged()" classname="com.crambeary.journalsync.JournalTest" time="0.001" />
+  <testcase name="overCapSaveIsReportedBeforeAnyFileOrFolderIsChanged()" classname="com.crambeary.journalsync.JournalTest" time="0.002" />
+  </testsuite>
