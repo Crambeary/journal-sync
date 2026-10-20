@@ -5,6 +5,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import com.crambeary.journalsync.Journal;
+import com.crambeary.journalsync.JournalConfig;
+import com.crambeary.journalsync.JournalFeedback;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
@@ -19,7 +21,7 @@ import org.slf4j.Logger;
  * binds the screen; closing a bound screen saves its pages back. Unbound screens are never touched.
  */
 public final class BoundBook {
-	/** System property that overrides the default journal path (used by tests; real config comes later). */
+	/** System property that overrides the configured journal path (tests and launcher overrides). */
 	public static final String PATH_PROPERTY = "journal_sync.path";
 
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -51,12 +53,20 @@ public final class BoundBook {
 		return binding != null && binding.screen == screen;
 	}
 
-	public static Path journalPath() {
-		String override = System.getProperty(PATH_PROPERTY);
-		if (override != null) {
-			return Path.of(override);
-		}
-		return FabricLoader.getInstance().getGameDir().resolve("journal-sync").resolve("journal.md");
+	public static JournalConfig configuration() throws IOException {
+		return JournalConfig.read(FabricLoader.getInstance().getConfigDir().resolve("journal-sync.json"));
+	}
+
+	public static Path journalPath() throws IOException {
+		return journalPath(configuration());
+	}
+
+	private static Path journalPath(JournalConfig config) {
+		Minecraft client = Minecraft.getInstance();
+		String world = client.getSingleplayerServer() == null ? null
+			: client.getSingleplayerServer().getWorldData().getLevelName();
+		String server = client.getCurrentServer() == null ? null : client.getCurrentServer().ip;
+		return config.resolve(gameDirectory(), world, server, System.getProperty(PATH_PROPERTY));
 	}
 
 	private static Path gameDirectory() {
@@ -66,14 +76,21 @@ public final class BoundBook {
 
 	/** The Journal button / keybind action: fill the book from the journal file and bind the screen. */
 	public static void press(BookEditScreen screen) {
-		Path file = journalPath();
-		Path gameDirectory = gameDirectory();
-		Journal.LoadOutcome outcome = Journal.load(file, List.copyOf(screen.pages), gameDirectory, 20);
-		if (outcome instanceof Journal.LoadOutcome.Failed failed) {
-			LOGGER.error("Could not load journal at {}: {}", file, failed.reason());
+		Path file;
+		JournalConfig config;
+		try {
+			config = configuration();
+			file = journalPath(config);
+		} catch (IOException | RuntimeException e) {
+			JournalStatus.show(new JournalFeedback(JournalFeedback.Kind.INVALID_CONFIG, e.getMessage()));
 			return;
 		}
-		Journal.Loaded loaded = ((Journal.LoadOutcome.LoadedWithBackup) outcome).loaded();
+		Path gameDirectory = gameDirectory();
+		JournalFeedback.LoadResult result = JournalFeedback.load(file, List.copyOf(screen.pages), gameDirectory, config.backupCount());
+		JournalStatus.show(result.feedback());
+		if (!result.succeeded()) return;
+		Journal.Loaded loaded = result.loaded();
+		if (binding != null && !binding.file.equals(file)) releaseLock(binding);
 
 		screen.pages.clear();
 		screen.pages.addAll(loaded.pages().isEmpty() ? List.of("") : loaded.pages());
@@ -91,7 +108,7 @@ public final class BoundBook {
 				}
 			});
 		}
-		binding = new Binding(screen, file, loaded.token(), gameDirectory, 20);
+		binding = new Binding(screen, file, loaded.token(), gameDirectory, config.backupCount());
 	}
 
 	private static void onScreenRemoved(Screen screen) {
@@ -100,9 +117,9 @@ public final class BoundBook {
 		}
 		Binding closing = binding;
 		binding = null;
-		releaseLock(closing);
 
 		if (closing.discarded) {
+			releaseLock(closing);
 			// Escape on a book and quill throws the edit away in vanilla; the file follows the book.
 			LOGGER.info("Book closed with Escape; leaving the journal at {} as it is", closing.file);
 			return;
@@ -111,9 +128,11 @@ public final class BoundBook {
 		List<String> pages = List.copyOf(closing.screen.pages);
 		Journal.SaveOutcome outcome = Journal.save(closing.file, pages, closing.token, closing.gameDirectory, closing.backupCount);
 		if (outcome instanceof Journal.SaveOutcome.Conflict) {
+			releaseLock(closing);
 			askWhatToDo(closing, pages);
 		} else {
 			report(closing.file, outcome);
+			releaseLock(closing);
 		}
 	}
 
@@ -133,10 +152,12 @@ public final class BoundBook {
 	private static void releaseLock(Binding closing) {
 		if (Journal.removeLock(closing.file) instanceof Journal.LockOutcome.Failed failed) {
 			LOGGER.error("Could not remove journal lock: {}", failed.reason());
+			JournalStatus.show(new JournalFeedback(JournalFeedback.Kind.LOCK_FAILED, failed.reason()));
 		}
 	}
 
 	private static void report(Path file, Journal.SaveOutcome outcome) {
+		JournalStatus.show(JournalFeedback.saved(outcome, file));
 		switch (outcome) {
 			case Journal.SaveOutcome.Failed failed ->
 				LOGGER.error("Could not save the journal to {}: {}", file, failed.reason());

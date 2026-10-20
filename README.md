@@ -28,6 +28,36 @@ world with `publishServer` and checks the host's book flow.
 
 `./gradlew runProductionClientGameTest -PprismModsDir=<launcher instance>/minecraft/mods` runs the same test with exactly the jars in that folder (for example Fabric API and Book Copy from the Prism 26.2 instance) instead of the default Fabric API. The jars are referenced by path and never committed; only the two game-test modules the published Fabric API bundle leaves out are added on top.
 
-## Journal path (until config arrives in ticket 08)
+## Journal path
 
-The journal file is `<game dir>/journal-sync/journal.md`. Override it with the JVM argument `-Djournal_sync.path=/full/path/to/journal.md`.
+Settings live in `<game dir>/config/journal-sync.json`, created with defaults on first Journal press:
+
+```json
+{
+  "globalPath": "journal-sync/journal.md",
+  "backupCount": 20
+}
+```
+
+Paths can be absolute (including a vault outside Minecraft) or relative to the game directory.
+Optional `worldPathTemplate` and `serverPathTemplate` override the global path in single-player
+and multiplayer respectively. For example, `"worldPathTemplate": "journals/{world-name}.md"`
+and `"serverPathTemplate": "journals/{server-address}.md"`. Spaces, address colons, slashes and
+other unsafe filename characters in replacement values become underscores. Server context takes
+precedence over world context. Unknown placeholders and invalid settings are reported in-game;
+fix the JSON and press Journal again without restarting.
+
+The JVM argument `-Djournal_sync.path=/full/path/to/journal.md` overrides the selected path
+(config must still be valid). A missing journal keeps the book's existing text, shows a warning,
+and is created with its parent directories when the bound book closes.
+
+Press **Journal**, or **J** while editing a book and quill, to bind it. Rebind **Bind book to journal**
+in Options → Controls → Key Binds → Miscellaneous. The button reads **Bound** while syncing that
+screen. Toasts report load/save results; chat retains the full path and any error details.
+
+`backupCount` accepts a nonnegative integer (default 20) and applies to both prior-book and
+pre-overwrite backups in `<game dir>/journal-sync-backups`. Zero retains no backups.
+The resolved path and backup policy are retained for the open binding. A `.lock` sidecar
+exists while bound; stale locks do not block loading. Done saves; Escape discards journal
+edits as vanilla does. Conflicts offer keep book (with backup), keep file, or a conflict
+copy; Enter and Escape in the prompt safely choose a copy.

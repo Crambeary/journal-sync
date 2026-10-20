@@ -1,0 +1,8 @@
+{
+    "version": "26.2",
+    "metadataUrl": "https://piston-meta.mojang.com/v1/packages/bdfd9856166b7171857c491f15479762f3abda99/26.2.json",
+    "metadataSha1": "bdfd9856166b7171857c491f15479762f3abda99",
+    "serverUrl": "https://piston-data.mojang.com/v1/objects/823e2250d24b3ddac457a60c92a6a941943fcd6a/server.jar",
+    "serverSha1": "823e2250d24b3ddac457a60c92a6a941943fcd6a",
+    "verifiedSha1": "823e2250d24b3ddac457a60c92a6a941943fcd6a"
+}

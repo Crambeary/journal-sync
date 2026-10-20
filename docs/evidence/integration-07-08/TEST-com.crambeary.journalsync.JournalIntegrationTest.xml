@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crambeary.journalsync.JournalIntegrationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:49:52.086Z" hostname="bagend" time="0.081">
+  <properties/>
+  <testcase name="backupFailurePreventsNormalAndKeepBookOverwrite()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.005"/>
+  <testcase name="missingFileLoadsOnceWithBackupAndLockThenCreatesOnSave()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.009"/>
+  <testcase name="keepBookBacksUpExactExternalBytesButOtherChoicesPreserveBytesAndTime()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.003"/>
+  <testcase name="backupLockAndReadFailuresMapToLoadFailureAndRejectedReloadKeepsLock()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.004"/>
+  <testcase name="parsedCountRotatesBothLoadAndSaveBackups()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.057"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

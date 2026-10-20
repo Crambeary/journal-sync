@@ -38,3 +38,11 @@ All Gradle invocations used the supplied JDK/cache/Xvfb wrapper and the shared `
 2. Have another player open a 26.2 world to LAN, allow commands, and give your joining player a book and quill. Join from Prism, hold the book and right-click, press Journal, check both pages, type a distinctive suffix, and click Done. Confirm the suffix in the local note. Disconnect/rejoin and open the same book **without pressing Journal**; the suffix and second page must still be there.
 3. Repeat against your own unmodified Mojang 26.2 dedicated server with **no server mods installed**. Give the book from its console (`give <player> writable_book`). Check the local note and disconnect/rejoin persistence in the same way. Use normal server authentication settings for the real server; offline mode above is only for the isolated automated test.
 4. Record Prism/mod versions, server type/address (no credentials), screenshots, and pass/fail in ticket 10. Ticket 10 still owns human confirmation of the real launcher, vault/Obsidian, LAN join, and external network server; those are not claimed by these localhost tests.
+
+
+## Ticket 07 / 08 integration
+
+Both game-test entrypoints and the Mojang server task remain registered. The combined
+integration reruns the original Fabric dedicated-server reconnect, real vanilla-server
+reconnect and published LAN-host assertions with config, feedback, backups and sidecar
+lifecycle installed. Current evidence: `docs/evidence/integration-07-08/verification.md`.

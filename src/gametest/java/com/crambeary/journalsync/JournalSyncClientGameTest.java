@@ -13,6 +13,10 @@ import java.util.Objects;
 import com.crambeary.journalsync.client.BoundBook;
 import com.crambeary.journalsync.client.ConflictScreen;
 import net.minecraft.client.gui.components.Button;
+import com.crambeary.journalsync.client.JournalSyncClient;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import org.lwjgl.glfw.GLFW;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -83,10 +87,239 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 	private static List<String> runScenarios(
 		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
 		throws IOException {
+		feedbackAndReboundKey(context, server, connection, name, journal);
+		configuredBackupsAndBinding(context, server, connection, name, journal);
+		backupAndLockErrors(context, server, connection, journal);
 		unboundBookLeavesJournalUntouched(context, server, connection, name, journal);
 		escapeDiscardsBoundEdits(context, server, connection, name, journal);
 		conflictsOfferAllResolutions(context, server, connection, name, journal);
-		return journalLoadsAndSavesOnClose(context, server, connection, name, journal);
+		List<String> saved = journalLoadsAndSavesOnClose(context, server, connection, name, journal);
+		System.out.println("Integration 07/08: " + name + " config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed");
+		return saved;
+	}
+
+	private static void feedbackAndReboundKey(ClientGameTestContext context, TestServerContext server,
+		TestServerConnection connection, String name, Path journal) throws IOException {
+		// Exercise vanilla's Controls rebind handler, then press the mapping through Fabric test input.
+		context.setScreen(() -> new KeyBindsScreen(null, net.minecraft.client.Minecraft.getInstance().options));
+		context.runOnClient(client -> {
+			assertTrue("registered in Controls", java.util.Arrays.asList(client.options.keyMappings).contains(JournalSyncClient.journalKey));
+			((KeyBindsScreen) client.gui.screen()).selectedKey = JournalSyncClient.journalKey;
+		});
+		context.getInput().pressKey(GLFW.GLFW_KEY_K);
+		context.runOnClient(client -> assertEquals("rebound key", "key.keyboard.k", JournalSyncClient.journalKey.saveString()));
+		context.setScreen(() -> null);
+		Files.writeString(journal, NOTE);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		context.waitTick();
+		assertTrue("key binds screen", BoundBook.isBound(screen));
+		assertEquals("key loads same pages as button", NOTE_PAGES, List.copyOf(screen.pages));
+		context.getInput().holdKey(JournalSyncClient.journalKey);
+		context.getInput().typeChar('k');
+		context.getInput().releaseKey(JournalSyncClient.journalKey);
+		assertEquals("shortcut character is not inserted into journal", NOTE_PAGES, List.copyOf(screen.pages));
+		assertFeedback(context, "Journal loaded");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-rebound-key-loaded");
+		clickDone(context, connection);
+		assertFeedback(context, "Journal saved");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-saved-feedback");
+
+		// An existing directory is a deterministic unreadable journal even when tests run as root.
+		System.setProperty(BoundBook.PATH_PROPERTY, journal.getParent().toString());
+		screen = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("keep this book");
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		assertTrue("failed load remains unbound", !BoundBook.isBound(screen));
+		assertEquals("failed load preserves text", List.of("keep this book"), List.copyOf(screen.pages));
+		assertEquals("failed load preserves journal", NOTE, Files.readString(journal));
+		assertFeedback(context, "Cannot read journal");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-unreadable-error");
+		clickDone(context, connection);
+
+		Path config = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("journal-sync.json");
+		String validConfig = Files.readString(config);
+		try {
+			Files.writeString(config, "{ invalid");
+			screen = openBookTheRealWay(context, server, connection);
+			context.clickScreenButton("journal_sync.button.journal");
+			assertTrue("invalid config does not bind", !BoundBook.isBound(screen));
+			assertFeedback(context, "Invalid journal-sync.json");
+			context.waitTicks(15);
+			context.takeScreenshot(name + "-invalid-config");
+			clickDone(context, connection);
+		} finally {
+			Files.writeString(config, validConfig);
+		}
+
+		System.setProperty(BoundBook.PATH_PROPERTY, journal.toString());
+		Files.delete(journal);
+		screen = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("new journal text");
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		context.waitTick();
+		assertFeedback(context, "Journal missing");
+		assertEquals("missing file preserves text", List.of("new journal text"), List.copyOf(screen.pages));
+		assertTrue("missing file not created until close", !Files.exists(journal));
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-missing-warning");
+		clickDone(context, connection);
+		assertEquals("first save creates journal", "new journal text", Files.readString(journal));
+
+		// Bind a valid file, then replace it with a directory to force a close-time write failure.
+		screen = openBookTheRealWay(context, server, connection);
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		Files.delete(journal);
+		Files.createDirectory(journal);
+		clickDone(context, connection);
+		assertFeedback(context, "Journal save failed");
+		assertTrue("save failure removes lock", !Files.exists(Journal.lockPath(journal)));
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-save-error");
+		Files.delete(journal);
+		context.runOnClient(client -> {
+			JournalSyncClient.journalKey.setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_J));
+			KeyMapping.resetMapping();
+		});
+	}
+
+	/** Exercise actual config resolution and snapshot policy, including rejected reloads. */
+	private static void configuredBackupsAndBinding(ClientGameTestContext context, TestServerContext server,
+		TestServerConnection connection, String name, Path journal) throws IOException {
+		Path config = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("journal-sync.json");
+		String originalConfig = Files.readString(config);
+		Path game = journal.getParent().resolve(name + "-configured-game");
+		Path file = game.resolve("configured.md");
+		Path backups = game.resolve("journal-sync-backups");
+		Files.createDirectories(backups);
+		for (int i = 0; i < 5; i++) {
+			Path seed = backups.resolve("seed-" + i + ".md");
+			Files.writeString(seed, "seed-" + i);
+			Files.setLastModifiedTime(seed, FileTime.fromMillis(1000 + i));
+		}
+		Files.writeString(file, "configured note");
+		System.clearProperty(BoundBook.PATH_PROPERTY);
+		System.setProperty("journal_sync.game_dir", game.toString());
+		try {
+			Files.writeString(config, "{\"globalPath\":\"configured.md\",\"backupCount\":2}");
+			BookEditScreen book = openBookTheRealWay(context, server, connection);
+			context.getInput().typeChars("previous book");
+			context.clickScreenButton("journal_sync.button.journal");
+			assertEquals("config resolves actual client path", List.of("configured note"), List.copyOf(book.pages));
+			assertEquals("load uses configured count", 2, backupContents(backups).size());
+			assertTrue("load backs up previous book", backupContents(backups).contains("previous book"));
+			assertTrue("configured lock exists", Files.exists(Journal.lockPath(file)));
+
+			// Invalid config and failed read must preserve this binding and its pages/lock.
+			Files.writeString(config, "{invalid");
+			context.getInput().pressKey(JournalSyncClient.journalKey);
+			assertFeedback(context, "Invalid journal-sync.json");
+			assertTrue("invalid config preserves valid binding", BoundBook.isBound(book));
+			Files.writeString(config, "{\"globalPath\":\".\",\"backupCount\":9}");
+			context.getInput().pressKey(JournalSyncClient.journalKey);
+			assertFeedback(context, "Cannot read journal");
+			assertTrue("failed reload preserves valid binding", BoundBook.isBound(book));
+			assertEquals("failed reload preserves book", List.of("configured note"), List.copyOf(book.pages));
+			assertTrue("failed reload preserves lock", Files.exists(Journal.lockPath(file)));
+
+			// Changing every policy input while bound cannot redirect save or change rotation.
+			Files.writeString(config, "{\"globalPath\":\"other.md\",\"backupCount\":9}");
+			System.setProperty(BoundBook.PATH_PROPERTY, game.resolve("override.md").toString());
+			System.setProperty("journal_sync.game_dir", game.resolve("other-game").toString());
+			context.getInput().typeChars(" edited");
+			clickDone(context, connection);
+			assertEquals("binding retains resolved path", "configured note edited", Files.readString(file));
+			assertEquals("save retains configured count", 2, backupContents(backups).size());
+			assertTrue("save backs up overwritten file", backupContents(backups).contains("configured note"));
+			assertTrue("previous book remains recoverable", backupContents(backups).contains("previous book"));
+			assertTrue("save removes original lock", !Files.exists(Journal.lockPath(file)));
+			assertTrue("save ignores changed path", !Files.exists(game.resolve("override.md")));
+			assertTrue("save ignores changed game dir", !Files.exists(game.resolve("other-game")));
+		} finally {
+			Files.writeString(config, originalConfig);
+			System.setProperty(BoundBook.PATH_PROPERTY, journal.toString());
+			System.setProperty("journal_sync.game_dir", journal.getParent().resolve("game").toString());
+		}
+	}
+
+	private static void backupAndLockErrors(ClientGameTestContext context, TestServerContext server,
+		TestServerConnection connection, Path journal) throws IOException {
+		Files.writeString(journal, NOTE);
+		Path blockedGame = journal.getParent().resolve("blocked-game");
+		Files.writeString(blockedGame, "not a directory");
+		System.setProperty("journal_sync.game_dir", blockedGame.toString());
+		BookEditScreen book = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("preserve me");
+		context.clickScreenButton("journal_sync.button.journal");
+		assertFeedback(context, "Cannot read journal");
+		assertTrue("backup failure leaves unbound", !BoundBook.isBound(book));
+		assertEquals("backup failure preserves book", List.of("preserve me"), List.copyOf(book.pages));
+		assertTrue("backup failure creates no lock", !Files.exists(Journal.lockPath(journal)));
+		System.setProperty("journal_sync.game_dir", journal.getParent().resolve("game").toString());
+		Files.delete(blockedGame);
+
+		Files.createDirectory(Journal.lockPath(journal));
+		context.clickScreenButton("journal_sync.button.journal");
+		assertFeedback(context, "Cannot read journal");
+		assertTrue("lock failure leaves unbound", !BoundBook.isBound(book));
+		assertEquals("lock failure preserves book", List.of("preserve me"), List.copyOf(book.pages));
+		Files.delete(Journal.lockPath(journal));
+		context.clickScreenButton("journal_sync.button.journal");
+		assertTrue("retry binds successfully", BoundBook.isBound(book));
+		// Force a backup failure after binding: close still releases the sidecar.
+		Path backupFolder = journal.getParent().resolve("game/journal-sync-backups");
+		Path hidden = backupFolder.resolveSibling("held-backups");
+		Files.move(backupFolder, hidden);
+		Files.writeString(backupFolder, "not a directory");
+		clickDone(context, connection);
+		assertFeedback(context, "Journal save failed");
+		assertEquals("backup failure preserves journal bytes", NOTE, Files.readString(journal));
+		assertTrue("backup failure close removes lock", !Files.exists(Journal.lockPath(journal)));
+		Files.delete(backupFolder);
+		Files.move(hidden, backupFolder);
+
+		book = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		Files.delete(Journal.lockPath(journal));
+		Files.createDirectory(Journal.lockPath(journal));
+		Files.writeString(Journal.lockPath(journal).resolve("block-delete"), "blocked");
+		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		context.waitTicks(2);
+		assertFeedback(context, "Cannot remove journal lock");
+		assertTrue("lock removal failure ends binding", !BoundBook.isBound(book));
+		context.waitTicks(15);
+		context.takeScreenshot("integration-lock-removal-error");
+		Files.delete(Journal.lockPath(journal).resolve("block-delete"));
+		Files.delete(Journal.lockPath(journal));
+	}
+
+	private static List<String> backupContents(Path folder) throws IOException {
+		try (var paths = Files.list(folder)) {
+			return paths.map(path -> {
+				try { return Files.readString(path); }
+				catch (IOException e) { throw new UncheckedIOException(e); }
+			}).toList();
+		}
+	}
+
+	private static void assertFeedback(ClientGameTestContext context, String expected) {
+		context.runOnClient(client -> {
+			try {
+				var state = client.gui.hud.getChat().storeState();
+				var field = state.getClass().getDeclaredField("messages");
+				field.setAccessible(true);
+				@SuppressWarnings("unchecked")
+				var messages = (List<net.minecraft.client.multiplayer.chat.GuiMessage>) field.get(state);
+				assertTrue("latest visible feedback contains " + expected,
+					!messages.isEmpty() && messages.getFirst().content().getString().contains(expected));
+			} catch (ReflectiveOperationException e) {
+				throw new AssertionError("Cannot inspect rendered chat feedback", e);
+			}
+		});
 	}
 
 	/** Open and close a book without pressing Journal: the file is not touched, vanilla editing still works. */
@@ -160,6 +393,7 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 		assertTrue(name + ": Escape ends binding", !BoundBook.isBound(screen));
 		assertEquals(name + ": Escape preserves external bytes", OBSIDIAN_EDIT, Files.readString(journal));
 		assertEquals(name + ": Escape preserves modified time", modified, Files.getLastModifiedTime(journal));
+		assertTrue(name + ": Escape removes lock", !Files.exists(Journal.lockPath(journal)));
 		assertEquals(name + ": Escape discards vanilla book edits", List.of(), serverBookPages(server));
 	}
 
@@ -199,14 +433,19 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 			context.waitFor(mc -> mc.gui.screen() == null);
 			context.waitTick();
 			assertTrue(name + ": conflict ends binding", !BoundBook.isBound(book));
+			assertTrue(name + ": conflict removes lock", !Files.exists(Journal.lockPath(journal)));
 			// Done already sent vanilla's edit packet; the prompt controls only the journal file.
 			assertEquals(name + ": server retains edited book", editedPages, serverBookPages(server));
 			if (choice.equals("keep_book")) {
 				assertEquals(name + ": keep book", edited, Files.readString(journal));
+				assertTrue(name + ": keep book backs up raw external bytes", backupContents(journal.getParent().resolve("game/journal-sync-backups")).contains(OBSIDIAN_EDIT));
+				assertFeedback(context, "Journal saved");
 			} else {
 				assertEquals(name + ": preserve CRLF and frontmatter", OBSIDIAN_EDIT, Files.readString(journal));
 				assertEquals(name + ": preserve file time", modified, Files.getLastModifiedTime(journal));
 			}
+			if (choice.equals("keep_file")) assertFeedback(context, "External journal kept");
+			if (choice.equals("default") || choice.equals("escape")) assertFeedback(context, "Book saved as a conflict copy");
 			List<Path> after = conflictCopies(journal);
 			if (choice.equals("default") || choice.equals("escape")) {
 				List<Path> created = after.stream().filter(path -> !before.contains(path)).toList();

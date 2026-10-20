@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crambeary.journalsync.BookLimitsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:49:41.841Z" hostname="bagend" time="10.175">
+  <properties/>
+  <testcase name="writableBookPageHoldsOneThousandTwentyFourCharacters()" classname="com.crambeary.journalsync.BookLimitsTest" time="0.017"/>
+  <testcase name="writableBookHasOneHundredPages()" classname="com.crambeary.journalsync.BookLimitsTest" time="0.001"/>
+  <testcase name="bookContentRefusesMoreThanTheMaximumPages()" classname="com.crambeary.journalsync.BookLimitsTest" time="0.003"/>
+  <system-out><![CDATA[[11:49:42] [INFO] [FabricLoader/MixinExtras|Service]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.5).
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

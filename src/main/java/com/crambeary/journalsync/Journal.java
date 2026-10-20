@@ -209,7 +209,7 @@ public final class Journal {
 		return String.join(PAGE_SEPARATOR, pages);
 	}
 
-	/** Preserves the book's current pages, replaces any stale lock, then loads the journal. */
+	/** Reads the journal, preserves the current book, and creates/replaces the informational lock before binding. */
 	public static LoadOutcome load(Path file, List<String> previousBookPages, Path gameDirectory, int backupCount) {
 		try {
 			Loaded loaded = load(file);
@@ -264,15 +264,15 @@ public final class Journal {
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "*.md")) {
 			List<Path> backups = new java.util.ArrayList<>();
 			stream.forEach(backups::add);
-			backups.sort(Comparator.comparingLong(Journal::modified).reversed());
+			backups.sort(Comparator.comparing(Journal::modified).reversed());
 			for (int i = backupCount; i < backups.size(); i++) Files.deleteIfExists(backups.get(i));
 		}
 		return backup;
 	}
 
-	private static long modified(Path path) {
-		try { return Files.getLastModifiedTime(path).toMillis(); }
-		catch (IOException e) { return Long.MIN_VALUE; }
+	private static java.nio.file.attribute.FileTime modified(Path path) {
+		try { return Files.getLastModifiedTime(path); }
+		catch (IOException e) { return java.nio.file.attribute.FileTime.fromMillis(Long.MIN_VALUE); }
 	}
 
 	private static String message(Exception e) { return e.getMessage() != null ? e.getMessage() : e.toString(); }

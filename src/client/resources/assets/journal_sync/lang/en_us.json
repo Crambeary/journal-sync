@@ -1,8 +1,21 @@
 {
-	"journal_sync.button.journal": "Journal",
-	"journal_sync.conflict.title": "Journal changed on disk",
-	"journal_sync.conflict.message": "The journal file was edited outside Minecraft while this book was open. What should happen to your book's changes?",
-	"journal_sync.conflict.conflict_copy": "Save as conflict copy",
-	"journal_sync.conflict.keep_book": "Keep my book",
-	"journal_sync.conflict.keep_file": "Keep the file"
+  "journal_sync.button.journal": "Journal",
+  "journal_sync.conflict.title": "Journal changed on disk",
+  "journal_sync.conflict.message": "The journal file was edited outside Minecraft while this book was open. What should happen to your book's changes?",
+  "journal_sync.conflict.conflict_copy": "Save as conflict copy",
+  "journal_sync.conflict.keep_book": "Keep my book",
+  "journal_sync.conflict.keep_file": "Keep the file",
+  "journal_sync.button.bound": "Bound",
+  "journal_sync.key.journal": "Bind book to journal",
+  "journal_sync.feedback.loaded": "Journal loaded; book bound. Close to save.",
+  "journal_sync.feedback.missing": "Journal missing; keeping book text. Close to create it.",
+  "journal_sync.feedback.saved": "Journal saved.",
+  "journal_sync.feedback.load_failed": "Cannot read journal or prepare backup/lock. Book unchanged. See chat for reason.",
+  "journal_sync.feedback.save_failed": "Journal save failed! See chat for path and reason.",
+  "journal_sync.feedback.invalid_config": "Invalid journal-sync.json. Book unchanged. See chat.",
+  "journal_sync.feedback.cap_exceeded": "Journal exceeds the book page cap. Sync refused.",
+  "journal_sync.feedback.conflict": "Journal changed on disk. Choose how to save.",
+  "journal_sync.feedback.kept_file": "External journal kept. Book changes were not written to it.",
+  "journal_sync.feedback.conflict_copy": "Book saved as a conflict copy.",
+  "journal_sync.feedback.lock_failed": "Cannot remove journal lock. See chat for path and reason."
 }
