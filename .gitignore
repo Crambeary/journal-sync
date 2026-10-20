@@ -1,1 +1,9 @@
 __pycache__/
+.gradle/
+build/
+run/
+.idea/
+*.iml
+.vscode/
+hs_err_*.log
+.gradle-home/

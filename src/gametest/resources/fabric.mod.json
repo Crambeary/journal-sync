@@ -1,0 +1,12 @@
+{
+	"schemaVersion": 1,
+	"id": "journal_sync_test",
+	"version": "1.0.0",
+	"name": "Journal Sync tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"com.crambeary.journalsync.JournalSyncClientGameTest"
+		]
+	}
+}

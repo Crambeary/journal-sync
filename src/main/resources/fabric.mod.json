@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "journal_sync",
+	"version": "${version}",
+	"name": "Journal Sync",
+	"description": "Keeps a book and quill in step with a markdown journal file.",
+	"authors": [
+		"Marc Totaro"
+	],
+	"contact": {
+		"sources": "https://github.com/Crambeary/journal-sync"
+	},
+	"license": "MIT",
+	"icon": "assets/journal_sync/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.crambeary.journalsync.client.JournalSyncClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
