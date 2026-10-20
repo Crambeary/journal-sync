@@ -1,0 +1,36 @@
+// Test-only Mojang server: resolve the pinned game version through Mojang's manifests and
+// verify even cached bytes. No launcher, Fabric loader, or mod jars enter this server process.
+tasks.register('downloadVanillaTestServer') {
+    def destination = layout.buildDirectory.dir('vanilla-test-server')
+    def gameVersion = project.minecraft_version.toString()
+    outputs.dir(destination)
+    outputs.upToDateWhen { false } // Recheck the manifest hash, including cached downloads.
+    doLast {
+        def json = new groovy.json.JsonSlurper()
+        def manifest = json.parse(new URI('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json').toURL())
+        def version = manifest.versions.find { it.id == gameVersion }
+        if (version == null) throw new GradleException("Missing Mojang version ${gameVersion}")
+        def metadataBytes = new URI(version.url).toURL().bytes
+        def sha1 = { byte[] bytes -> java.security.MessageDigest.getInstance('SHA-1').digest(bytes).encodeHex().toString() }
+        if (sha1(metadataBytes) != version.sha1) throw new GradleException('Mojang version metadata SHA-1 mismatch')
+        def server = json.parse(metadataBytes).downloads.server
+        def folder = destination.get().asFile
+        folder.mkdirs()
+        def jar = new File(folder, 'server.jar')
+        if (!jar.exists() || sha1(jar.bytes) != server.sha1) {
+            def bytes = new URI(server.url).toURL().bytes
+            if (sha1(bytes) != server.sha1) throw new GradleException('Mojang server SHA-1 mismatch')
+            jar.bytes = bytes
+        }
+        new File(folder, 'provenance.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+            version: gameVersion, metadataUrl: version.url, metadataSha1: version.sha1,
+            serverUrl: server.url, serverSha1: server.sha1, verifiedSha1: sha1(jar.bytes)
+        ])) + '\n'
+    }
+}
+
+tasks.named('runProductionClientGameTest') {
+    dependsOn tasks.named('downloadVanillaTestServer')
+    jvmArgs.add("-Djournal_sync.test.vanillaJar=${layout.buildDirectory.file('vanilla-test-server/server.jar').get().asFile.absolutePath}")
+    jvmArgs.add("-Djournal_sync.test.serverRoot=${layout.buildDirectory.dir('vanilla-test-runs').get().asFile.absolutePath}")
+}

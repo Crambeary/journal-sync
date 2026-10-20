@@ -1,0 +1,31 @@
+Validation on 2026-10-20, from the ticket 09 worktree.
+All Gradle commands serialized under:
+  flock /tmp/claude-1000/journal-sync-gametest.lock
+Wrapper: /tmp/journal-sync-codex-gradle.sh (JDK 25, real Xvfb, shared cache).
+These paths describe the runner, not a dependency of the test implementation.
+CI uses ./gradlew build and ./gradlew runProductionClientGameTest.
+
+Initial build:
+  BUILD SUCCESSFUL in 11s
+  10 actionable tasks: 10 executed
+  JUnit XML: JournalTest 10 tests, BookLimitsTest 3 tests;
+  zero skipped, failures, or errors in either suite.
+
+Final combined build + production game test:
+  BUILD SUCCESSFUL in 1m 46s
+  16 actionable tasks: 2 executed, 14 up-to-date
+  Configuration cache entry stored.
+  Ticket 09: LAN host and unmodified vanilla server load/edit/save/reconnect assertions passed
+
+Both registered client game tests ran: JournalSyncClientGameTest (singleplayer,
+Fabric dedicated server, reopen/reconnect) and MultiplayerJournalGameTest
+(published LAN host, separate Mojang vanilla server, reconnect).
+
+The vanilla-server.log shows edited server-owned item NBT and two logins,
+then a clean server shutdown with all dimensions saved. A post-run jcmd listing
+showed no vanilla server or client for this worktree; other agents' JVMs remained.
+
+Final standalone build after all edits:
+  BUILD SUCCESSFUL in 1s
+  10 actionable tasks: 10 up-to-date
+  Configuration cache entry stored.

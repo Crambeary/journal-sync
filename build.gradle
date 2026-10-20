@@ -117,6 +117,8 @@ tasks.register("runProductionClientGameTest", net.fabricmc.loom.task.prod.Client
 	}
 }
 
+apply from: 'gradle/vanilla-test-server.gradle'
+
 // configure the maven publication
 publishing {
 	publications {
