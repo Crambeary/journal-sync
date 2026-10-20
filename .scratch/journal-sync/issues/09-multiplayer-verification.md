@@ -11,3 +11,6 @@
 - [ ] If the test API supports it: client game test connects to a dedicated server, loads the journal into a book and quill, edits, closes, and the file is updated (screenshot); the edited book persists server-side after reconnect
 - [ ] Otherwise: a step-by-step manual procedure in the repo for testing against a vanilla dedicated server and a LAN-hosted world, which ticket 10 uses
 - [ ] Confirmed no server-side install is needed (vanilla server)
+- [ ] Vanilla server: a client game test joins a real vanilla Mojang server jar (no Fabric, no Fabric API) started as a separate process on `localhost`, runs the real item-use book flow, and the edit persists after reconnect
+- [ ] The book is opened by giving a real book and quill and using it (not `setScreen`), so the server holds the item the edit packet refers to
+- [ ] LAN host: a test world is opened to LAN (`publishServer`) and the book flow runs on the host; the joining-client path is the same code as the dedicated-server case, so no second client is needed

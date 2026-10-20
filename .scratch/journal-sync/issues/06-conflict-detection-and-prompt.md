@@ -11,3 +11,4 @@
 - [ ] No prompt and a normal save when the file is unchanged
 - [ ] Prompt defaults to conflict copy
 - [ ] Client game test (scenario 3): edit file while bound book is open, close → prompt shown (screenshot), default choice produces a conflict copy
+- [ ] Core test (and the client game test) covers the file being edited externally while the book is open, including CRLF line endings and frontmatter written by Obsidian

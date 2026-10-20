@@ -12,3 +12,5 @@
 - [ ] Client game test (scenario 2): type text, close → file contains the edited text
 - [ ] Client game test: open and close a book without pressing Journal → file untouched
 - [ ] Works in the user's real single-player world (quick manual check noted in this ticket)
+- [ ] Client game test opens the book the real way (`give` a book and quill, then use the item), not via `setScreen`, so the server holds the item the edit packet refers to; close, reconnect, and the server-side item has the saved pages
+- [ ] Prism mod set: the production client game test also runs once with the jars from the Prism 26.2 instance's `mods/` folder (Book Copy, Fabric API) alongside this mod, and passes

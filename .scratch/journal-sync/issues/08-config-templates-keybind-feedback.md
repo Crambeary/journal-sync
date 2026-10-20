@@ -11,3 +11,5 @@
 - [ ] Missing journal file created on first save
 - [ ] Keybind appears in controls, is rebindable, and triggers the same action as the button
 - [ ] Success and error feedback shown in-game for load and save (screenshot of at least one error case)
+- [ ] Client game test presses the rebindable Journal keybind (via the game-test input API) and gets the same result as the button
+- [ ] Core test: a 120-page note and a missing or unreadable journal path produce the in-game error feedback without touching the file

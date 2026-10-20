@@ -11,3 +11,5 @@
 - [ ] Rotation keeps exactly the newest 20; tested through core's interface
 - [ ] Lock sidecar created on bind, removed on close; a pre-existing stale lock does not prevent loading
 - [ ] Client game test: after load and close, a backup exists and no lock remains
+- [ ] Core test: a stale lock left by a crash does not block loading and is replaced by the new lock
+- [ ] Core test: backup and lock behaviour with a missing, read-only, or unwritable journal directory reports an error and never crashes
