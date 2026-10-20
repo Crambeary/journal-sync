@@ -11,6 +11,11 @@ import java.util.List;
 import java.util.Objects;
 
 import com.crambeary.journalsync.client.BoundBook;
+import com.crambeary.journalsync.client.JournalSyncClient;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
+import org.lwjgl.glfw.GLFW;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
@@ -79,8 +84,113 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 	private static List<String> runScenarios(
 		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
 		throws IOException {
+		feedbackAndReboundKey(context, server, connection, name, journal);
 		unboundBookLeavesJournalUntouched(context, server, connection, name, journal);
 		return journalLoadsAndSavesOnClose(context, server, connection, name, journal);
+	}
+
+	private static void feedbackAndReboundKey(ClientGameTestContext context, TestServerContext server,
+		TestServerConnection connection, String name, Path journal) throws IOException {
+		// Exercise vanilla's Controls rebind handler, then press the mapping through Fabric test input.
+		context.setScreen(() -> new KeyBindsScreen(null, net.minecraft.client.Minecraft.getInstance().options));
+		context.runOnClient(client -> {
+			assertTrue("registered in Controls", java.util.Arrays.asList(client.options.keyMappings).contains(JournalSyncClient.journalKey));
+			((KeyBindsScreen) client.gui.screen()).selectedKey = JournalSyncClient.journalKey;
+		});
+		context.getInput().pressKey(GLFW.GLFW_KEY_K);
+		context.runOnClient(client -> assertEquals("rebound key", "key.keyboard.k", JournalSyncClient.journalKey.saveString()));
+		context.setScreen(() -> null);
+		Files.writeString(journal, NOTE);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		context.waitTick();
+		assertTrue("key binds screen", BoundBook.isBound(screen));
+		assertEquals("key loads same pages as button", NOTE_PAGES, List.copyOf(screen.pages));
+		context.getInput().holdKey(JournalSyncClient.journalKey);
+		context.getInput().typeChar('k');
+		context.getInput().releaseKey(JournalSyncClient.journalKey);
+		assertEquals("shortcut character is not inserted into journal", NOTE_PAGES, List.copyOf(screen.pages));
+		assertFeedback(context, "Journal loaded");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-rebound-key-loaded");
+		clickDone(context, connection);
+		assertFeedback(context, "Journal saved");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-saved-feedback");
+
+		// An existing directory is a deterministic unreadable journal even when tests run as root.
+		System.setProperty(BoundBook.PATH_PROPERTY, journal.getParent().toString());
+		screen = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("keep this book");
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		assertTrue("failed load remains unbound", !BoundBook.isBound(screen));
+		assertEquals("failed load preserves text", List.of("keep this book"), List.copyOf(screen.pages));
+		assertEquals("failed load preserves journal", NOTE, Files.readString(journal));
+		assertFeedback(context, "Cannot read journal");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-unreadable-error");
+		clickDone(context, connection);
+
+		Path config = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("journal-sync.json");
+		String validConfig = Files.readString(config);
+		try {
+			Files.writeString(config, "{ invalid");
+			screen = openBookTheRealWay(context, server, connection);
+			context.clickScreenButton("journal_sync.button.journal");
+			assertTrue("invalid config does not bind", !BoundBook.isBound(screen));
+			assertFeedback(context, "Invalid journal-sync.json");
+			context.waitTicks(15);
+			context.takeScreenshot(name + "-invalid-config");
+			clickDone(context, connection);
+		} finally {
+			Files.writeString(config, validConfig);
+		}
+
+		System.setProperty(BoundBook.PATH_PROPERTY, journal.toString());
+		Files.delete(journal);
+		screen = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("new journal text");
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		context.waitTick();
+		assertFeedback(context, "Journal missing");
+		assertEquals("missing file preserves text", List.of("new journal text"), List.copyOf(screen.pages));
+		assertTrue("missing file not created until close", !Files.exists(journal));
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-missing-warning");
+		clickDone(context, connection);
+		assertEquals("first save creates journal", "new journal text", Files.readString(journal));
+
+		// Bind a valid file, then replace it with a directory to force a close-time write failure.
+		screen = openBookTheRealWay(context, server, connection);
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		Files.delete(journal);
+		Files.createDirectory(journal);
+		clickDone(context, connection);
+		assertFeedback(context, "Journal save failed");
+		context.waitTicks(15);
+		context.takeScreenshot(name + "-save-error");
+		Files.delete(journal);
+		context.runOnClient(client -> {
+			JournalSyncClient.journalKey.setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_J));
+			KeyMapping.resetMapping();
+		});
+	}
+
+	private static void assertFeedback(ClientGameTestContext context, String expected) {
+		context.runOnClient(client -> {
+			try {
+				var state = client.gui.hud.getChat().storeState();
+				var field = state.getClass().getDeclaredField("messages");
+				field.setAccessible(true);
+				@SuppressWarnings("unchecked")
+				var messages = (List<net.minecraft.client.multiplayer.chat.GuiMessage>) field.get(state);
+				assertTrue("latest visible feedback contains " + expected,
+					!messages.isEmpty() && messages.getFirst().content().getString().contains(expected));
+			} catch (ReflectiveOperationException e) {
+				throw new AssertionError("Cannot inspect rendered chat feedback", e);
+			}
+		});
 	}
 
 	/** Open and close a book without pressing Journal: the file is not touched, vanilla editing still works. */
