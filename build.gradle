@@ -14,6 +14,8 @@ repositories {
 loom {
 	splitEnvironmentSourceSets()
 
+	accessWidenerPath = file("src/client/resources/journal_sync.accesswidener")
+
 	mods {
 		"journal_sync" {
 			sourceSet sourceSets.main
@@ -79,8 +81,18 @@ jar {
 	}
 }
 
+// Opt-in: -PprismModsDir=<a launcher instance's mods folder> runs the production game test with exactly
+// those jars (e.g. Fabric API and Book Copy from the Prism 26.2 instance) instead of the default Fabric API.
+def prismModsDir = project.findProperty("prismModsDir")
+
 dependencies {
-	productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	if (prismModsDir == null) {
+		productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	} else {
+		// The published Fabric API bundle has no game test modules; the test run still needs them.
+		productionRuntimeMods("net.fabricmc.fabric-api:fabric-client-gametest-api-v1:${project.fabric_client_gametest_api_version}") { transitive = false }
+		productionRuntimeMods("net.fabricmc.fabric-api:fabric-gametest-api-v1:${project.fabric_gametest_api_version}") { transitive = false }
+	}
 }
 
 // The game test mod, packaged so the production client can load it next to the real mod jar.
@@ -91,6 +103,9 @@ tasks.register("gametestJar", Jar) {
 
 tasks.register("runProductionClientGameTest", net.fabricmc.loom.task.prod.ClientProductionRunTask) {
 	mods.from tasks.named("gametestJar")
+	if (prismModsDir != null) {
+		mods.from fileTree(dir: prismModsDir, include: "*.jar")
+	}
 	jvmArgs.add("-Dfabric.client.gametest")
 	// Headless: run the game under a virtual framebuffer (needs Xvfb installed).
 	useXVFB = true

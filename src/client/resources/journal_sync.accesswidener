@@ -1,0 +1,9 @@
+accessWidener v2 official
+
+# The book screen keeps its pages private and only sends them to the server from the Done button.
+# Journal Sync fills the pages from the journal file and reads them back when the screen closes.
+accessible field net/minecraft/client/gui/screens/inventory/BookEditScreen pages Ljava/util/List;
+accessible field net/minecraft/client/gui/screens/inventory/BookEditScreen currentPage I
+accessible method net/minecraft/client/gui/screens/inventory/BookEditScreen updatePageContent ()V
+accessible method net/minecraft/client/gui/screens/inventory/BookEditScreen updateButtonVisibility ()V
+accessible method net/minecraft/client/gui/screens/inventory/BookEditScreen setInitialFocus ()V
