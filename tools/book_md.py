@@ -4,7 +4,7 @@ A Book Copy export is an uncompressed NBT file (no extension) holding one
 `pages` list of strings, found in <instance>/minecraft/config/bookcopy/.
 
 A note is the book's pages joined by a marker line, so
-markdown -> JSON -> markdown is byte-identical. Notes are LF-only.
+markdown -> book -> markdown is byte-identical. Notes are LF-only.
 
     book_md.py to-md   book  note.md
     book_md.py to-book note.md  book
