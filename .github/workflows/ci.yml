@@ -37,7 +37,7 @@ jobs:
 
       - name: Upload game test screenshots
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: gametest-screenshots
           path: run/screenshots/
