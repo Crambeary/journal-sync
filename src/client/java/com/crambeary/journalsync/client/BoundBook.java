@@ -28,13 +28,17 @@ public final class BoundBook {
 		final BookEditScreen screen;
 		final Path file;
 		final Journal.LoadToken token;
+		final Path gameDirectory;
+		final int backupCount;
 		/** Escape was pressed: vanilla discards the edit, so the journal file must not take it either. */
 		boolean discarded;
 
-		Binding(BookEditScreen screen, Path file, Journal.LoadToken token) {
+		Binding(BookEditScreen screen, Path file, Journal.LoadToken token, Path gameDirectory, int backupCount) {
 			this.screen = screen;
 			this.file = file;
 			this.token = token;
+			this.gameDirectory = gameDirectory;
+			this.backupCount = backupCount;
 		}
 	}
 
@@ -55,16 +59,21 @@ public final class BoundBook {
 		return FabricLoader.getInstance().getGameDir().resolve("journal-sync").resolve("journal.md");
 	}
 
+	private static Path gameDirectory() {
+		String override = System.getProperty("journal_sync.game_dir");
+		return override == null ? FabricLoader.getInstance().getGameDir() : Path.of(override);
+	}
+
 	/** The Journal button / keybind action: fill the book from the journal file and bind the screen. */
 	public static void press(BookEditScreen screen) {
 		Path file = journalPath();
-		Journal.Loaded loaded;
-		try {
-			loaded = Journal.load(file);
-		} catch (IOException e) {
-			LOGGER.error("Could not read the journal at {}", file, e);
+		Path gameDirectory = gameDirectory();
+		Journal.LoadOutcome outcome = Journal.load(file, List.copyOf(screen.pages), gameDirectory, 20);
+		if (outcome instanceof Journal.LoadOutcome.Failed failed) {
+			LOGGER.error("Could not load journal at {}: {}", file, failed.reason());
 			return;
 		}
+		Journal.Loaded loaded = ((Journal.LoadOutcome.LoadedWithBackup) outcome).loaded();
 
 		screen.pages.clear();
 		screen.pages.addAll(loaded.pages().isEmpty() ? List.of("") : loaded.pages());
@@ -82,7 +91,7 @@ public final class BoundBook {
 				}
 			});
 		}
-		binding = new Binding(screen, file, loaded.token());
+		binding = new Binding(screen, file, loaded.token(), gameDirectory, 20);
 	}
 
 	private static void onScreenRemoved(Screen screen) {
@@ -91,6 +100,7 @@ public final class BoundBook {
 		}
 		Binding closing = binding;
 		binding = null;
+		releaseLock(closing);
 
 		if (closing.discarded) {
 			// Escape on a book and quill throws the edit away in vanilla; the file follows the book.
@@ -99,9 +109,9 @@ public final class BoundBook {
 		}
 
 		List<String> pages = List.copyOf(closing.screen.pages);
-		Journal.SaveOutcome outcome = Journal.save(closing.file, pages, closing.token);
+		Journal.SaveOutcome outcome = Journal.save(closing.file, pages, closing.token, closing.gameDirectory, closing.backupCount);
 		if (outcome instanceof Journal.SaveOutcome.Conflict) {
-			askWhatToDo(closing.file, pages, closing.token);
+			askWhatToDo(closing, pages);
 		} else {
 			report(closing.file, outcome);
 		}
@@ -111,10 +121,19 @@ public final class BoundBook {
 	 * The file changed while the book was open: ask which side wins. Deferred a tick because this runs
 	 * inside the book screen's own removal, which would otherwise overwrite the prompt with its null screen.
 	 */
-	private static void askWhatToDo(Path file, List<String> pages, Journal.LoadToken token) {
+	private static void askWhatToDo(Binding closing, List<String> pages) {
 		Minecraft minecraft = Minecraft.getInstance();
 		minecraft.schedule(() -> minecraft.gui.setScreen(new ConflictScreen(
-			resolution -> report(file, Journal.save(file, pages, token, resolution)))));
+			resolution -> {
+				report(closing.file, Journal.save(closing.file, pages, closing.token, resolution, closing.gameDirectory, closing.backupCount));
+				releaseLock(closing);
+			})));
+	}
+
+	private static void releaseLock(Binding closing) {
+		if (Journal.removeLock(closing.file) instanceof Journal.LockOutcome.Failed failed) {
+			LOGGER.error("Could not remove journal lock: {}", failed.reason());
+		}
 	}
 
 	private static void report(Path file, Journal.SaveOutcome outcome) {

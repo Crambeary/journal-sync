@@ -1,6 +1,12 @@
 package com.crambeary.journalsync;
 
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Comparator;
+import java.util.UUID;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.FileAlreadyExistsException;
@@ -79,6 +85,18 @@ public final class Journal {
 		}
 	}
 
+	/** Result of a load that must preserve the book's previous contents first. */
+	public sealed interface LoadOutcome {
+		record LoadedWithBackup(Loaded loaded, Path backup) implements LoadOutcome { }
+		record Failed(String reason) implements LoadOutcome { }
+	}
+
+	/** Result of creating or removing the informational lock sidecar. */
+	public sealed interface LockOutcome {
+		record Updated() implements LockOutcome { }
+		record Failed(String reason) implements LockOutcome { }
+	}
+
 	private static final DateTimeFormatter COPY_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
 	/**
@@ -105,7 +123,7 @@ public final class Journal {
 	 * @param token the token from the {@link #load} that this save follows
 	 */
 	public static SaveOutcome save(Path file, List<String> pages, LoadToken token) {
-		return save(file, pages, token, null);
+		return save(file, pages, token, null, Path.of(System.getProperty("user.dir")), 20);
 	}
 
 	/**
@@ -116,18 +134,26 @@ public final class Journal {
 	 * @param resolution what to do on a conflict, or {@code null} to report {@link SaveOutcome.Conflict}
 	 */
 	public static SaveOutcome save(Path file, List<String> pages, LoadToken token, Resolution resolution) {
+		return save(file, pages, token, resolution, Path.of(System.getProperty("user.dir")), 20);
+	}
+
+	public static SaveOutcome save(Path file, List<String> pages, LoadToken token, Path gameDirectory, int backupCount) {
+		return save(file, pages, token, null, gameDirectory, backupCount);
+	}
+
+	public static SaveOutcome save(Path file, List<String> pages, LoadToken token, Resolution resolution, Path gameDirectory, int backupCount) {
 		try {
 			if (!token.equals(currentToken(file))) {
 				if (resolution == null) {
 					return new SaveOutcome.Conflict();
 				}
 				return switch (resolution) {
-					case KEEP_BOOK -> write(file, pages);
+					case KEEP_BOOK -> write(file, pages, gameDirectory, backupCount);
 					case KEEP_FILE -> new SaveOutcome.KeptFile();
 					case CONFLICT_COPY -> writeConflictCopy(file, pages);
 				};
 			}
-			return write(file, pages);
+			return write(file, pages, gameDirectory, backupCount);
 		} catch (IOException | RuntimeException e) {
 			return new SaveOutcome.Failed(e.getMessage() != null ? e.getMessage() : e.toString());
 		}
@@ -142,7 +168,10 @@ public final class Journal {
 		}
 	}
 
-	private static SaveOutcome write(Path file, List<String> pages) throws IOException {
+	private static SaveOutcome write(Path file, List<String> pages, Path gameDirectory, int backupCount) throws IOException {
+		if (Files.exists(file)) {
+			writeBackup(gameDirectory, file.getFileName().toString(), Files.readAllBytes(file), backupCount);
+		}
 		createParentFolder(file);
 		Files.writeString(file, join(pages), StandardCharsets.UTF_8);
 		return new SaveOutcome.Saved();
@@ -172,11 +201,94 @@ public final class Journal {
 		Path folder = file.toAbsolutePath().getParent();
 		if (folder != null) {
 			Files.createDirectories(folder);
+			ensureWritableDirectory(folder);
 		}
 	}
 
 	private static String join(List<String> pages) {
 		return String.join(PAGE_SEPARATOR, pages);
+	}
+
+	/** Preserves the book's current pages, replaces any stale lock, then loads the journal. */
+	public static LoadOutcome load(Path file, List<String> previousBookPages, Path gameDirectory, int backupCount) {
+		try {
+			Loaded loaded = load(file);
+			Path backup = writeBackup(gameDirectory, "book", join(previousBookPages).getBytes(StandardCharsets.UTF_8), backupCount);
+			LockOutcome lock = createLock(file);
+			if (lock instanceof LockOutcome.Failed failed) return new LoadOutcome.Failed(failed.reason());
+			return new LoadOutcome.LoadedWithBackup(loaded, backup);
+		} catch (IOException | RuntimeException e) {
+			return new LoadOutcome.Failed(message(e));
+		}
+	}
+
+	/** Creates or replaces the informational sidecar. A stale sidecar never blocks loading. */
+	public static LockOutcome createLock(Path file) {
+		try {
+			Path lock = lockPath(file);
+			Path parent = lock.toAbsolutePath().getParent();
+			if (parent != null) {
+				Files.createDirectories(parent);
+				ensureWritableDirectory(parent);
+			}
+			Files.writeString(lock, "Journal Sync is open\n", StandardCharsets.UTF_8,
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+			return new LockOutcome.Updated();
+		} catch (IOException | RuntimeException e) {
+			return new LockOutcome.Failed(message(e));
+		}
+	}
+
+	/** Removes the sidecar when the bound screen closes. */
+	public static LockOutcome removeLock(Path file) {
+		try {
+			Path lock = lockPath(file);
+			Path parent = lock.toAbsolutePath().getParent();
+			if (parent != null && Files.exists(parent)) ensureWritableDirectory(parent);
+			Files.deleteIfExists(lock);
+			return new LockOutcome.Updated();
+		} catch (IOException | RuntimeException e) {
+			return new LockOutcome.Failed(message(e));
+		}
+	}
+
+	public static Path lockPath(Path file) { return file.resolveSibling(file.getFileName() + ".lock"); }
+
+	private static Path writeBackup(Path gameDirectory, String prefix, byte[] bytes, int backupCount) throws IOException {
+		if (backupCount < 0) throw new IllegalArgumentException("backupCount must not be negative");
+		Path folder = gameDirectory.resolve("journal-sync-backups");
+		Files.createDirectories(folder);
+		ensureWritableDirectory(folder);
+		Path backup = folder.resolve(prefix + "-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".md");
+		Files.write(backup, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+		try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "*.md")) {
+			List<Path> backups = new java.util.ArrayList<>();
+			stream.forEach(backups::add);
+			backups.sort(Comparator.comparingLong(Journal::modified).reversed());
+			for (int i = backupCount; i < backups.size(); i++) Files.deleteIfExists(backups.get(i));
+		}
+		return backup;
+	}
+
+	private static long modified(Path path) {
+		try { return Files.getLastModifiedTime(path).toMillis(); }
+		catch (IOException e) { return Long.MIN_VALUE; }
+	}
+
+	private static String message(Exception e) { return e.getMessage() != null ? e.getMessage() : e.toString(); }
+
+	private static void ensureWritableDirectory(Path directory) throws IOException {
+		try {
+			var permissions = Files.getPosixFilePermissions(directory);
+			if (!permissions.contains(PosixFilePermission.OWNER_WRITE)
+				&& !permissions.contains(PosixFilePermission.GROUP_WRITE)
+				&& !permissions.contains(PosixFilePermission.OTHERS_WRITE)) {
+				throw new AccessDeniedException(directory.toString(), null, "directory has no write permission");
+			}
+		} catch (UnsupportedOperationException ignored) {
+			// Files.isWritable covers filesystems without POSIX permission bits.
+			if (!Files.isWritable(directory)) throw new AccessDeniedException(directory.toString());
+		}
 	}
 
 	private static List<String> splitPages(String text) {

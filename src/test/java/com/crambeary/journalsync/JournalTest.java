@@ -9,6 +9,9 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.Comparator;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
@@ -85,7 +88,7 @@ class JournalTest {
 		Path file = writeFile("old");
 		Journal.LoadToken token = Journal.load(file).token();
 
-		Journal.SaveOutcome outcome = Journal.save(file, List.of("one", "two\nlines", "three"), token);
+		Journal.SaveOutcome outcome = Journal.save(file, List.of("one", "two\nlines", "three"), token, dir.resolve("game"), 20);
 
 		Assertions.assertEquals(new Journal.SaveOutcome.Saved(), outcome);
 		Assertions.assertEquals(
@@ -98,7 +101,7 @@ class JournalTest {
 		Path file = writeFile(note);
 		Journal.Loaded loaded = Journal.load(file);
 
-		Journal.save(file, loaded.pages(), loaded.token());
+		Journal.save(file, loaded.pages(), loaded.token(), dir.resolve("game"), 20);
 
 		Assertions.assertEquals(note, Files.readString(file, StandardCharsets.UTF_8));
 	}
@@ -108,7 +111,7 @@ class JournalTest {
 		Path file = dir.resolve("vault").resolve("notes").resolve("journal.md");
 		Journal.Loaded loaded = Journal.load(file);
 
-		Journal.SaveOutcome outcome = Journal.save(file, List.of("fresh"), loaded.token());
+		Journal.SaveOutcome outcome = Journal.save(file, List.of("fresh"), loaded.token(), dir.resolve("game"), 20);
 
 		Assertions.assertEquals(new Journal.SaveOutcome.Saved(), outcome);
 		Assertions.assertEquals("fresh", Files.readString(file, StandardCharsets.UTF_8));
@@ -309,5 +312,92 @@ class JournalTest {
 
 		Journal.save(file, List.of("mine"), loaded.token(), Journal.Resolution.KEEP_BOOK);
 		Assertions.assertEquals("mine", Files.readString(file, StandardCharsets.UTF_8));
+	}
+	@Test
+	void loadBacksUpThePreviousBookAndReplacesAStaleLock() throws Exception {
+		Path file = writeFile("journal text");
+		Path lock = Journal.lockPath(file);
+		Files.writeString(lock, "crashed process");
+
+		Journal.LoadOutcome outcome = Journal.load(file, List.of("old page", "old second"), dir.resolve("game"), 20);
+
+		Journal.LoadOutcome.LoadedWithBackup loaded = Assertions.assertInstanceOf(Journal.LoadOutcome.LoadedWithBackup.class, outcome);
+		Assertions.assertEquals(List.of("journal text"), loaded.loaded().pages());
+		Assertions.assertEquals("old page\n" + MARKER + "\nold second", Files.readString(loaded.backup()));
+		Assertions.assertEquals("Journal Sync is open\n", Files.readString(lock));
+	}
+
+	@Test
+	void saveBacksUpTheOldFileBeforeEveryOverwriteAndRotatesToRequestedCount() throws Exception {
+		Path file = writeFile("value-0");
+		Path gameDirectory = dir.resolve("game");
+		for (int i = 1; i <= 22; i++) {
+			Journal.SaveOutcome outcome = Journal.save(file, List.of("value-" + i), Journal.load(file).token(), gameDirectory, 20);
+			Assertions.assertEquals(new Journal.SaveOutcome.Saved(), outcome);
+			Thread.sleep(2);
+		}
+		Path backups = gameDirectory.resolve("journal-sync-backups");
+		List<Path> retained;
+		try (var stream = Files.list(backups)) {
+			retained = stream.sorted(Comparator.comparingLong(path -> {
+				try { return Files.getLastModifiedTime(path).toMillis(); }
+				catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+			})).toList();
+		}
+		Assertions.assertEquals(20, retained.size());
+		Assertions.assertEquals("value-2", Files.readString(retained.getFirst()));
+		Assertions.assertEquals("value-21", Files.readString(retained.getLast()));
+		Assertions.assertEquals("value-22", Files.readString(file));
+	}
+
+	@Test
+	void lockCanBeRemovedIdempotently() throws Exception {
+		Path file = dir.resolve("missing").resolve("journal.md");
+		Assertions.assertEquals(new Journal.LockOutcome.Updated(), Journal.createLock(file));
+		Assertions.assertTrue(Files.exists(Journal.lockPath(file)));
+		Assertions.assertEquals(new Journal.LockOutcome.Updated(), Journal.removeLock(file));
+		Assertions.assertFalse(Files.exists(Journal.lockPath(file)));
+		Assertions.assertEquals(new Journal.LockOutcome.Updated(), Journal.removeLock(file));
+	}
+
+	@Test
+	void loadReportsBackupAndLockFilesystemFailuresWithoutThrowing() throws Exception {
+		Path blocked = dir.resolve("blocked");
+		Files.writeString(blocked, "not a directory");
+		Journal.LoadOutcome backupFailure = Journal.load(dir.resolve("journal.md"), List.of("previous"), blocked, 20);
+		Assertions.assertInstanceOf(Journal.LoadOutcome.Failed.class, backupFailure);
+
+		Journal.LoadOutcome lockFailure = Journal.load(blocked.resolve("journal.md"), List.of(), dir.resolve("game"), 20);
+		Assertions.assertInstanceOf(Journal.LoadOutcome.Failed.class, lockFailure);
+		Assertions.assertInstanceOf(Journal.LockOutcome.Failed.class, Journal.createLock(blocked.resolve("journal.md")));
+		Assertions.assertInstanceOf(Journal.LockOutcome.Failed.class, Journal.removeLock(blocked.resolve("journal.md")));
+	}
+
+	@Test
+	void saveReportsMissingReadOnlyAndUnwritableJournalTargetsWithoutThrowing() throws Exception {
+		Path gameDirectory = dir.resolve("game");
+		Assertions.assertInstanceOf(Journal.SaveOutcome.Saved.class,
+			Journal.save(dir.resolve("missing-parent").resolve("journal.md"), List.of("new"), Journal.LoadToken.ABSENT, gameDirectory, 20));
+		Path directoryTarget = dir.resolve("directory-target");
+		Files.createDirectory(directoryTarget);
+		Assertions.assertInstanceOf(Journal.SaveOutcome.Failed.class,
+			Journal.save(directoryTarget, List.of("x"), Journal.LoadToken.ABSENT, gameDirectory, 20));
+		Path blocked = dir.resolve("blocked-file");
+		Files.writeString(blocked, "file");
+		Assertions.assertInstanceOf(Journal.SaveOutcome.Failed.class,
+			Journal.save(blocked.resolve("journal.md"), List.of("x"), Journal.LoadToken.ABSENT, gameDirectory, 20));
+		Path readOnly = dir.resolve("read-only");
+		Files.createDirectory(readOnly);
+		Set<PosixFilePermission> original = Files.getPosixFilePermissions(readOnly);
+		try {
+			Files.setPosixFilePermissions(readOnly, Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
+			Assertions.assertInstanceOf(Journal.SaveOutcome.Failed.class,
+				Journal.save(readOnly.resolve("journal.md"), List.of("x"), Journal.LoadToken.ABSENT, gameDirectory, 20));
+			Assertions.assertInstanceOf(Journal.LockOutcome.Failed.class, Journal.createLock(readOnly.resolve("journal.md")));
+			Journal.LoadOutcome load = Journal.load(readOnly.resolve("journal.md"), List.of(), dir.resolve("game-readonly"), 20);
+			Assertions.assertInstanceOf(Journal.LoadOutcome.Failed.class, load);
+		} finally {
+			Files.setPosixFilePermissions(readOnly, original);
+		}
 	}
 }
