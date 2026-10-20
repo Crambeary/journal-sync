@@ -1,0 +1,23 @@
+Validated 2026-10-20 in t3/conflict-detection-prompt on Minecraft 26.2 / JDK 25.
+All Gradle calls serialized with flock /tmp/claude-1000/journal-sync-gametest.lock.
+
+Initial toolchain command: /tmp/journal-sync-codex-gradle.sh build
+BUILD SUCCESSFUL in 13s
+10 actionable tasks: 10 executed
+
+Final command: /tmp/journal-sync-codex-gradle.sh build runProductionClientGameTest
+BUILD SUCCESSFUL in 51s
+15 actionable tasks: 9 executed, 6 up-to-date
+
+JUnit XML: JournalTest 22 tests, BookLimitsTest 3 tests; zero failures/errors/skips.
+Client game test exited 0 under real Xvfb, running all scenarios in single-player
+and against a dedicated server, then reconnecting and checking vanilla's book.
+Conflict scenarios assert all three resolutions; Enter activates initial focus
+and Escape dismisses to conflict copy. Original file bytes and modified time are
+preserved by keep-file and conflict-copy (external CRLF/frontmatter edit).
+Escape from a bound book discards edits and leaves external file/time intact.
+Normal bound close saves without a prompt. Unbound book remains untouched.
+
+Runtime emitted offline Fabric test-profile authentication/Realms errors, missing
+optional flite narrator library, and JVM Unsafe/native-access warnings; no test
+assertions failed. These do not exercise a signed-in launcher session.

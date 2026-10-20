@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crambeary.journalsync.JournalTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:36:25.404Z" hostname="bagend" time="0.074">
+  <properties/>
+  <testcase name="loadOfAnUnreadablePathFails()" classname="com.crambeary.journalsync.JournalTest" time="0.015"/>
+  <testcase name="keepBookOverwritesTheExternallyEditedFile()" classname="com.crambeary.journalsync.JournalTest" time="0.007"/>
+  <testcase name="keepFileLeavesTheExternallyEditedFileUntouched()" classname="com.crambeary.journalsync.JournalTest" time="0.003"/>
+  <testcase name="anExternalEditIsReportedAsAConflictAndNothingIsWritten()" classname="com.crambeary.journalsync.JournalTest" time="0.003"/>
+  <testcase name="anObsidianEditWithCrlfAndFrontmatterIsAConflictAndEveryResolutionTreatsItByteForByte()" classname="com.crambeary.journalsync.JournalTest" time="0.005"/>
+  <testcase name="aFileDeletedWhileTheBookWasOpenIsAConflictAndKeepBookRecreatesIt()" classname="com.crambeary.journalsync.JournalTest" time="0.003"/>
+  <testcase name="saveWritesPagesJoinedByMarkerLines()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="loadedPagesFitTheRealBookComponent()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="anUnchangedFileSavesWithoutAConflict()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="conflictCopyWritesATimestampedSiblingAndLeavesTheOriginalUntouched()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="savingToAnUnwritablePathReportsFailureInsteadOfThrowing()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="loadOfAFileWithoutMarkersIsASingleKnownPage()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="twoConflictCopiesInTheSameSecondDoNotOverwriteEachOther()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="loadTokenCarriesTheSha256OfTheFileBytes()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="loadOfAMissingFileIsAnEmptyJournalWithAnAbsentToken()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="savingToAMissingFileCreatesItAndItsFolder()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="loadSplitsTheFileIntoPagesAtMarkerLines()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="aLineEndingOnlyChangeByAnotherToolIsStillAConflict()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="aFileCreatedWhileTheBookWasOpenIsAConflict()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="aMultiPageNoteSavesBackUnchanged()" classname="com.crambeary.journalsync.JournalTest" time="0.002"/>
+  <testcase name="aResolutionIsIgnoredWhenTheFileIsUnchanged()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <testcase name="theDefaultResolutionIsConflictCopy()" classname="com.crambeary.journalsync.JournalTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
