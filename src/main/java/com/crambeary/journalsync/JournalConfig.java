@@ -1,7 +1,8 @@
 package com.crambeary.journalsync;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.GsonBuilder;
+import com.google.gson.Strictness;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,7 +21,8 @@ public record JournalConfig(String globalPath, String worldPathTemplate, String 
 			return defaults;
 		}
 		try {
-			JsonObject json = JsonParser.parseString(Files.readString(configFile)).getAsJsonObject();
+			JsonObject json = new GsonBuilder().setStrictness(Strictness.STRICT).create()
+				.fromJson(Files.readString(configFile), JsonObject.class);
 			String global = string(json, "globalPath", defaults().globalPath());
 			String world = string(json, "worldPathTemplate", null);
 			String server = string(json, "serverPathTemplate", null);

@@ -36,7 +36,7 @@ class JournalConfigTest {
 
 	@Test void malformedAndInvalidSettingsAreReportedWithoutReplacingConfig() throws Exception {
 		Path file = dir.resolve("journal-sync.json");
-		for (String invalid : List.of("{", "[]", "null", "{\"globalPath\":false}", "{\"globalPath\":\"\"}",
+		for (String invalid : List.of("{", "[]", "null", "{globalPath:\"note.md\"}", "{} trailing", "{\"globalPath\":false}", "{\"globalPath\":\"\"}",
 			"{\"backupCount\":-1}", "{\"backupCount\":1.5}", "{\"backupCount\":\"20\"}",
 			"{\"worldPathTemplate\":\"{typo}.md\"}")) {
 			Files.writeString(file, invalid);
