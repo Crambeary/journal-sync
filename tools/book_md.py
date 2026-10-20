@@ -14,7 +14,7 @@ from pathlib import Path
 
 MARKER = "<!-- page -->"
 SEPARATOR = f"\n{MARKER}\n"
-PAGE_LIMIT = 1024  # WritableBookContent.PAGE_EDIT_LENGTH
+PAGE_LIMIT = 1024  # WritableBookContent.PAGE_EDIT_LENGTH, in UTF-16 units
 MAX_PAGES = 100  # WritableBookContent.MAX_PAGES
 
 
@@ -33,12 +33,27 @@ def markdown_to_book(text, title):
     return {"title": title, "pages": pages}
 
 
+def _utf16_len(text):
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _fit(text):
+    """Longest prefix length (in code points) within PAGE_LIMIT UTF-16 units."""
+    units = 0
+    for i, ch in enumerate(text):
+        units += 2 if ord(ch) > 0xFFFF else 1
+        if units > PAGE_LIMIT:
+            return i
+    return len(text)
+
+
 def _paginate(text):
     pages = []
-    while len(text) > PAGE_LIMIT:
-        cut = text.rfind("\n", 0, PAGE_LIMIT) + 1  # keep the newline on this page
+    while _utf16_len(text) > PAGE_LIMIT:
+        fit = _fit(text)
+        cut = text.rfind("\n", 0, fit) + 1  # keep the newline on this page
         if cut == 0:
-            cut = PAGE_LIMIT
+            cut = fit
         pages.append(text[:cut])
         text = text[cut:]
     pages.append(text)

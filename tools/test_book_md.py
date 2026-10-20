@@ -49,8 +49,16 @@ class AutoPagination(unittest.TestCase):
     def test_single_unbroken_line_longer_than_limit_is_hard_split(self):
         line = "x" * (book_md.PAGE_LIMIT * 2 + 5)
         book = book_md.markdown_to_book(line, title="t")
-        self.assertEqual([len(p) for p in book["pages"]], [1024, 1024, 5])
+        self.assertEqual([len(p) for p in book["pages"]], [book_md.PAGE_LIMIT, book_md.PAGE_LIMIT, 5])
         self.assertEqual("".join(book["pages"]), line)
+
+    def test_limit_counts_utf16_units_like_the_game(self):
+        text = "🌲" * book_md.PAGE_LIMIT  # 2 UTF-16 units each
+        pages = book_md.markdown_to_book(text, title="t")["pages"]
+        self.assertEqual(len(pages), 2)
+        self.assertEqual("".join(pages), text)
+        for page in pages:
+            self.assertLessEqual(len(page.encode("utf-16-le")) // 2, book_md.PAGE_LIMIT)
 
     def test_short_note_is_one_page(self):
         self.assertEqual(book_md.markdown_to_book("hi\n", title="t")["pages"], ["hi\n"])
