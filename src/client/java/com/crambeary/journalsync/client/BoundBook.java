@@ -8,8 +8,12 @@ import com.crambeary.journalsync.Journal;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.component.WritableBookContent;
 import org.slf4j.Logger;
 
 /**
@@ -24,6 +28,8 @@ public final class BoundBook {
 
 	private record Binding(BookEditScreen screen, Path file, Journal.LoadToken token) {
 	}
+
+	public static final SystemToast.SystemToastId PAGE_CAP_TOAST = new SystemToast.SystemToastId();
 
 	private static Binding binding;
 
@@ -48,6 +54,9 @@ public final class BoundBook {
 		Journal.Loaded loaded;
 		try {
 			loaded = Journal.load(file);
+		} catch (Journal.PageCapExceededException e) {
+			warnPageCap(e.pageCount(), WritableBookContent.MAX_PAGES);
+			return;
 		} catch (IOException e) {
 			LOGGER.error("Could not read the journal at {}", file, e);
 			return;
@@ -67,6 +76,12 @@ public final class BoundBook {
 		binding = new Binding(screen, file, loaded.token());
 	}
 
+	private static void warnPageCap(int pages, int limit) {
+		SystemToast.addOrUpdate(Minecraft.getInstance().gui.toastManager(), PAGE_CAP_TOAST,
+			Component.translatable("journal_sync.cap.title", pages, limit),
+			Component.translatable("journal_sync.cap.detail"));
+	}
+
 	private static void onScreenRemoved(Screen screen) {
 		if (!isBound(screen)) {
 			return;
@@ -75,6 +90,9 @@ public final class BoundBook {
 		binding = null;
 
 		Journal.SaveOutcome outcome = Journal.save(closing.file(), List.copyOf(closing.screen().pages), closing.token());
+		if (outcome instanceof Journal.SaveOutcome.OverCap overCap) {
+			warnPageCap(overCap.pageCount(), overCap.maxPages());
+		}
 		if (outcome instanceof Journal.SaveOutcome.Failed failed) {
 			LOGGER.error("Could not save the journal to {}: {}", closing.file(), failed.reason());
 		}

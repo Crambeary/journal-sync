@@ -1,3 +1,5 @@
 {
-	"journal_sync.button.journal": "Journal"
+	"journal_sync.button.journal": "Journal",
+	"journal_sync.cap.title": "Journal: %s pages (limit %s)",
+	"journal_sync.cap.detail": "Sync refused. File unchanged."
 }

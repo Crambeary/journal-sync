@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -19,6 +20,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.component.WritableBookContent;
@@ -80,6 +82,8 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
 		throws IOException {
 		unboundBookLeavesJournalUntouched(context, server, connection, name, journal);
+		markerlessNoteLoadsAndSavesLosslessly(context, server, connection, name, journal);
+		overCapLoadLeavesBookAndFileUntouched(context, server, connection, name, journal);
 		return journalLoadsAndSavesOnClose(context, server, connection, name, journal);
 	}
 
@@ -128,6 +132,66 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 		assertEquals(name + ": server-side book after close", expected, serverBookPages(server));
 		assertTrue(name + ": binding must end with the screen", !BoundBook.isBound(screen));
 		return expected;
+	}
+
+	/** A long marker-less note survives the actual editor and its close handler, including empty pages. */
+	private static void markerlessNoteLoadsAndSavesLosslessly(
+		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
+		throws IOException {
+		String original = "---\nmc-sync: true\n---\n" + "x".repeat(WritableBookContent.PAGE_EDIT_LENGTH) + "🐻\n\n";
+		Files.writeString(journal, original, StandardCharsets.UTF_8);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		List<String> pages = List.copyOf(screen.pages);
+		assertEquals(name + ": paginated book preserves all text", original, String.join("", pages));
+		assertTrue(name + ": long note gains pages", pages.size() > 1);
+		assertTrue(name + ": pages fit component limit", pages.stream()
+			.allMatch(page -> page.length() <= WritableBookContent.PAGE_EDIT_LENGTH));
+		clickDone(context, connection);
+		String saved = Files.readString(journal);
+		assertEquals(name + ": first save inserts markers only", String.join(PAGE_MARKER, pages), saved);
+		assertEquals(name + ": paginated pages reach server", pages, serverBookPages(server));
+
+		// Explicit empty pages at both ends must survive the editor's Done event as well.
+		String withEmptyPages = PAGE_MARKER + saved + PAGE_MARKER + PAGE_MARKER;
+		Files.writeString(journal, withEmptyPages, StandardCharsets.UTF_8);
+		screen = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		assertEquals(name + ": leading empty page", "", screen.pages.getFirst());
+		assertEquals(name + ": trailing empty page", "", screen.pages.getLast());
+		clickDone(context, connection);
+		assertEquals(name + ": empty pages and stable markers survive Done", withEmptyPages, Files.readString(journal));
+	}
+
+	/** Scenario 4: a refused 120-page file must neither bind the screen nor replace its text. */
+	private static void overCapLoadLeavesBookAndFileUntouched(
+		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
+		throws IOException {
+		String overCap = String.join(PAGE_MARKER, Collections.nCopies(120, "Keep every page."));
+		Files.writeString(journal, overCap, StandardCharsets.UTF_8);
+		FileTime modifiedBefore = Files.getLastModifiedTime(journal);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("Original book text.");
+		context.waitTick();
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		assertTrue(name + ": cap refusal must leave screen unbound", !BoundBook.isBound(screen));
+		assertEquals(name + ": cap refusal preserves book", List.of("Original book text."), List.copyOf(screen.pages));
+		assertTrue(name + ": cap warning toast exists", context.computeOnClient(minecraft ->
+			minecraft.gui.toastManager().getToast(SystemToast.class, BoundBook.PAGE_CAP_TOAST) != null));
+		// Allow the toast's entrance animation to finish before capturing the visible warning.
+		for (int tick = 0; tick < 30; tick++) {
+			context.waitTick();
+		}
+		context.takeScreenshot(name + "-120-page-cap-warning");
+		assertEquals(name + ": refused load preserves bytes", overCap, Files.readString(journal));
+		assertEquals(name + ": refused load preserves modified time", modifiedBefore, Files.getLastModifiedTime(journal));
+		clickDone(context, connection);
+		assertEquals(name + ": refused book close preserves bytes", overCap, Files.readString(journal));
+		assertEquals(name + ": refused book close preserves modified time", modifiedBefore, Files.getLastModifiedTime(journal));
+		assertEquals(name + ": original book still saved by vanilla", List.of("Original book text."), serverBookPages(server));
 	}
 
 	private static BookEditScreen openBookTheRealWay(
