@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Objects;
 
 import com.crambeary.journalsync.client.BoundBook;
+import com.crambeary.journalsync.client.ConflictScreen;
+import net.minecraft.client.gui.components.Button;
+import org.lwjgl.glfw.GLFW;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
@@ -80,6 +83,8 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
 		throws IOException {
 		unboundBookLeavesJournalUntouched(context, server, connection, name, journal);
+		escapeDiscardsBoundEdits(context, server, connection, name, journal);
+		conflictsOfferAllResolutions(context, server, connection, name, journal);
 		return journalLoadsAndSavesOnClose(context, server, connection, name, journal);
 	}
 
@@ -123,11 +128,97 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 
 		List<String> expected = new ArrayList<>(NOTE_PAGES);
 		expected.set(0, expected.getFirst() + TYPED);
+		assertTrue(name + ": ordinary save shows no prompt", context.computeOnClient(mc -> mc.gui.screen() == null));
 		assertEquals(name + ": journal file after close", String.join(PAGE_MARKER, expected),
 			Files.readString(journal, StandardCharsets.UTF_8));
 		assertEquals(name + ": server-side book after close", expected, serverBookPages(server));
 		assertTrue(name + ": binding must end with the screen", !BoundBook.isBound(screen));
 		return expected;
+	}
+
+
+	/** Escape mirrors vanilla discard, including when an external edit would otherwise need a prompt. */
+	private static void escapeDiscardsBoundEdits(
+		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
+		throws IOException {
+		Files.writeString(journal, NOTE, StandardCharsets.UTF_8);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		context.getInput().typeChars(TYPED);
+		Files.writeString(journal, OBSIDIAN_EDIT, StandardCharsets.UTF_8);
+		FileTime modified = Files.getLastModifiedTime(journal);
+		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		context.waitTicks(3);
+		connection.waitForServerboundPackets();
+		assertTrue(name + ": Escape closes without a prompt", context.computeOnClient(mc -> mc.gui.screen() == null));
+		assertTrue(name + ": Escape ends binding", !BoundBook.isBound(screen));
+		assertEquals(name + ": Escape preserves external bytes", OBSIDIAN_EDIT, Files.readString(journal));
+		assertEquals(name + ": Escape preserves modified time", modified, Files.getLastModifiedTime(journal));
+		assertEquals(name + ": Escape discards vanilla book edits", List.of(), serverBookPages(server));
+	}
+
+	private static final String OBSIDIAN_EDIT =
+		"---\r\nmc-sync: true\r\ntags: [minecraft]\r\n---\r\n# Vault edit\r\nFound diamonds.\r\n";
+
+	/** Scenario 3: edit externally while bound; test all buttons and the real one-key default. */
+	private static void conflictsOfferAllResolutions(
+		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
+		throws IOException {
+		for (String choice : List.of("default", "keep_file", "keep_book", "escape")) {
+			Files.writeString(journal, NOTE, StandardCharsets.UTF_8);
+			BookEditScreen book = openBookTheRealWay(context, server, connection);
+			context.clickScreenButton("journal_sync.button.journal");
+			context.getInput().typeChars(TYPED);
+			context.waitTick();
+			List<String> editedPages = context.computeOnClient(mc -> List.copyOf(book.pages));
+			String edited = String.join(PAGE_MARKER, editedPages);
+			Files.writeString(journal, OBSIDIAN_EDIT, StandardCharsets.UTF_8);
+			FileTime modified = Files.getLastModifiedTime(journal);
+			List<Path> before = conflictCopies(journal);
+			clickDone(context, connection);
+			context.waitForScreen(ConflictScreen.class);
+			assertEquals(name + ": prompt leaves external bytes intact", OBSIDIAN_EDIT, Files.readString(journal));
+			assertEquals(name + ": prompt writes no copy yet", before, conflictCopies(journal));
+			assertTrue(name + ": conflict copy has initial focus", context.computeOnClient(mc ->
+				mc.gui.screen().getFocused() instanceof Button button
+					&& button.getMessage().getString().equals("Save as conflict copy")));
+			context.takeScreenshot(name + "-conflict-" + choice);
+			if (choice.equals("default")) {
+				context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+			} else if (choice.equals("escape")) {
+				context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			} else {
+				context.clickScreenButton("journal_sync.conflict." + choice);
+			}
+			context.waitFor(mc -> mc.gui.screen() == null);
+			context.waitTick();
+			assertTrue(name + ": conflict ends binding", !BoundBook.isBound(book));
+			// Done already sent vanilla's edit packet; the prompt controls only the journal file.
+			assertEquals(name + ": server retains edited book", editedPages, serverBookPages(server));
+			if (choice.equals("keep_book")) {
+				assertEquals(name + ": keep book", edited, Files.readString(journal));
+			} else {
+				assertEquals(name + ": preserve CRLF and frontmatter", OBSIDIAN_EDIT, Files.readString(journal));
+				assertEquals(name + ": preserve file time", modified, Files.getLastModifiedTime(journal));
+			}
+			List<Path> after = conflictCopies(journal);
+			if (choice.equals("default") || choice.equals("escape")) {
+				List<Path> created = after.stream().filter(path -> !before.contains(path)).toList();
+				assertEquals(name + ": exactly one conflict copy", 1, created.size());
+				assertTrue(name + ": timestamped sibling", created.getFirst().getFileName().toString()
+					.matches("journal\\.conflict-\\d{8}-\\d{6}(-\\d+)?\\.md"));
+				assertEquals(name + ": copy contains book", edited, Files.readString(created.getFirst()));
+			} else {
+				assertEquals(name + ": no extra copy", before, after);
+			}
+		}
+	}
+
+	private static List<Path> conflictCopies(Path journal) throws IOException {
+		try (var paths = Files.list(journal.getParent())) {
+			return paths.filter(path -> path.getFileName().toString().startsWith("journal.conflict-"))
+				.sorted().toList();
+		}
 	}
 
 	private static BookEditScreen openBookTheRealWay(

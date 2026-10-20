@@ -7,7 +7,9 @@ import java.util.List;
 import com.crambeary.journalsync.Journal;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
 import org.slf4j.Logger;
@@ -22,7 +24,18 @@ public final class BoundBook {
 
 	private static final Logger LOGGER = LogUtils.getLogger();
 
-	private record Binding(BookEditScreen screen, Path file, Journal.LoadToken token) {
+	private static final class Binding {
+		final BookEditScreen screen;
+		final Path file;
+		final Journal.LoadToken token;
+		/** Escape was pressed: vanilla discards the edit, so the journal file must not take it either. */
+		boolean discarded;
+
+		Binding(BookEditScreen screen, Path file, Journal.LoadToken token) {
+			this.screen = screen;
+			this.file = file;
+			this.token = token;
+		}
 	}
 
 	private static Binding binding;
@@ -31,7 +44,7 @@ public final class BoundBook {
 	}
 
 	public static boolean isBound(Screen screen) {
-		return binding != null && binding.screen() == screen;
+		return binding != null && binding.screen == screen;
 	}
 
 	public static Path journalPath() {
@@ -63,6 +76,11 @@ public final class BoundBook {
 
 		if (!isBound(screen)) {
 			ScreenEvents.remove(screen).register(BoundBook::onScreenRemoved);
+			ScreenKeyboardEvents.beforeKeyPress(screen).register((pressed, event) -> {
+				if (event.isEscape() && isBound(pressed)) {
+					binding.discarded = true;
+				}
+			});
 		}
 		binding = new Binding(screen, file, loaded.token());
 	}
@@ -74,9 +92,43 @@ public final class BoundBook {
 		Binding closing = binding;
 		binding = null;
 
-		Journal.SaveOutcome outcome = Journal.save(closing.file(), List.copyOf(closing.screen().pages), closing.token());
-		if (outcome instanceof Journal.SaveOutcome.Failed failed) {
-			LOGGER.error("Could not save the journal to {}: {}", closing.file(), failed.reason());
+		if (closing.discarded) {
+			// Escape on a book and quill throws the edit away in vanilla; the file follows the book.
+			LOGGER.info("Book closed with Escape; leaving the journal at {} as it is", closing.file);
+			return;
+		}
+
+		List<String> pages = List.copyOf(closing.screen.pages);
+		Journal.SaveOutcome outcome = Journal.save(closing.file, pages, closing.token);
+		if (outcome instanceof Journal.SaveOutcome.Conflict) {
+			askWhatToDo(closing.file, pages, closing.token);
+		} else {
+			report(closing.file, outcome);
+		}
+	}
+
+	/**
+	 * The file changed while the book was open: ask which side wins. Deferred a tick because this runs
+	 * inside the book screen's own removal, which would otherwise overwrite the prompt with its null screen.
+	 */
+	private static void askWhatToDo(Path file, List<String> pages, Journal.LoadToken token) {
+		Minecraft minecraft = Minecraft.getInstance();
+		minecraft.schedule(() -> minecraft.gui.setScreen(new ConflictScreen(
+			resolution -> report(file, Journal.save(file, pages, token, resolution)))));
+	}
+
+	private static void report(Path file, Journal.SaveOutcome outcome) {
+		switch (outcome) {
+			case Journal.SaveOutcome.Failed failed ->
+				LOGGER.error("Could not save the journal to {}: {}", file, failed.reason());
+			case Journal.SaveOutcome.SavedAsConflictCopy copied ->
+				LOGGER.info("The journal at {} changed while the book was open; saved the book as {}", file, copied.copy());
+			case Journal.SaveOutcome.KeptFile kept ->
+				LOGGER.info("The journal at {} changed while the book was open; kept the file, dropped the book's changes", file);
+			case Journal.SaveOutcome.Conflict conflict ->
+				LOGGER.warn("The journal at {} changed while the book was open and was not saved", file);
+			case Journal.SaveOutcome.Saved saved -> {
+			}
 		}
 	}
 }

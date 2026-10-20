@@ -1,3 +1,8 @@
 {
-	"journal_sync.button.journal": "Journal"
+	"journal_sync.button.journal": "Journal",
+	"journal_sync.conflict.title": "Journal changed on disk",
+	"journal_sync.conflict.message": "The journal file was edited outside Minecraft while this book was open. What should happen to your book's changes?",
+	"journal_sync.conflict.conflict_copy": "Save as conflict copy",
+	"journal_sync.conflict.keep_book": "Keep my book",
+	"journal_sync.conflict.keep_file": "Keep the file"
 }
