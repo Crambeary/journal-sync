@@ -50,6 +50,7 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 	private static void runScenariosInAllWorlds(ClientGameTestContext context) throws IOException {
 		Path journal = Files.createTempDirectory("journal-sync-gametest").resolve("journal.md");
 		System.setProperty(BoundBook.PATH_PROPERTY, journal.toString());
+		System.setProperty("journal_sync.game_dir", journal.getParent().resolve("game").toString());
 
 		TestWorldSave save;
 		List<String> savedPages;
@@ -127,6 +128,11 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 			Files.readString(journal, StandardCharsets.UTF_8));
 		assertEquals(name + ": server-side book after close", expected, serverBookPages(server));
 		assertTrue(name + ": binding must end with the screen", !BoundBook.isBound(screen));
+		assertTrue(name + ": lock sidecar must be removed after close", !Files.exists(Journal.lockPath(journal)));
+		Path backupDirectory = journal.getParent().resolve("game").resolve("journal-sync-backups");
+		try (var backups = Files.list(backupDirectory)) {
+			assertTrue(name + ": prior book backup must exist after load", backups.findAny().isPresent());
+		}
 		return expected;
 	}
 

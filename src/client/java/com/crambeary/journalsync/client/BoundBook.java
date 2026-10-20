@@ -1,6 +1,5 @@
 package com.crambeary.journalsync.client;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -42,16 +41,21 @@ public final class BoundBook {
 		return FabricLoader.getInstance().getGameDir().resolve("journal-sync").resolve("journal.md");
 	}
 
+	private static Path gameDirectory() {
+		String override = System.getProperty("journal_sync.game_dir");
+		return override == null ? FabricLoader.getInstance().getGameDir() : Path.of(override);
+	}
+
 	/** The Journal button / keybind action: fill the book from the journal file and bind the screen. */
 	public static void press(BookEditScreen screen) {
 		Path file = journalPath();
-		Journal.Loaded loaded;
-		try {
-			loaded = Journal.load(file);
-		} catch (IOException e) {
-			LOGGER.error("Could not read the journal at {}", file, e);
+		Path gameDirectory = gameDirectory();
+		Journal.LoadOutcome loadOutcome = Journal.load(file, List.copyOf(screen.pages), gameDirectory, 20);
+		if (loadOutcome instanceof Journal.LoadOutcome.Failed failed) {
+			LOGGER.error("Could not back up or read the journal at {}: {}", file, failed.reason());
 			return;
 		}
+		Journal.Loaded loaded = ((Journal.LoadOutcome.LoadedWithBackup) loadOutcome).loaded();
 
 		screen.pages.clear();
 		screen.pages.addAll(loaded.pages().isEmpty() ? List.of("") : loaded.pages());
@@ -74,9 +78,14 @@ public final class BoundBook {
 		Binding closing = binding;
 		binding = null;
 
-		Journal.SaveOutcome outcome = Journal.save(closing.file(), List.copyOf(closing.screen().pages), closing.token());
+		Journal.SaveOutcome outcome = Journal.save(closing.file(), List.copyOf(closing.screen().pages), closing.token(),
+			gameDirectory(), 20);
 		if (outcome instanceof Journal.SaveOutcome.Failed failed) {
 			LOGGER.error("Could not save the journal to {}: {}", closing.file(), failed.reason());
+		}
+		Journal.LockOutcome lock = Journal.removeLock(closing.file());
+		if (lock instanceof Journal.LockOutcome.Failed failed) {
+			LOGGER.error("Could not remove journal lock at {}: {}", Journal.lockPath(closing.file()), failed.reason());
 		}
 	}
 }
