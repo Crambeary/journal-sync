@@ -8,6 +8,16 @@ A client-only Fabric mod for Minecraft 26.2 that keeps a book and quill in step 
 - `./gradlew test` — unit tests only.
 - `./gradlew runProductionClientGameTest` — runs the real client headless under Xvfb and saves screenshots to `run/screenshots/`.
 
+The game test also downloads the unmodified Mojang 26.2 server through Mojang's version
+manifest, verifies the metadata and server SHA-1, and caches it in
+`build/vanilla-test-server/`. The jar is never committed. The test starts a separate
+offline server bound to `127.0.0.1` on an available port, accepts the EULA only in
+its throwaway directory under `build/vanilla-test-runs/`, and stops the process in
+`finally` (including on assertion failures). It uses no server mods. CI runs this
+same task and needs network access for the Mojang download. Server console logs
+remain in that build directory for diagnosis. The LAN case publishes an integrated
+world with `publishServer` and checks the host's book flow.
+
 ## Environment notes
 
 - Needs JDK 25 to run Gradle (Gradle 9.7.1 cannot run on JDK 27). Point `JAVA_HOME` at a JDK 25.

@@ -1,0 +1,7 @@
+[11:38:21] [Render thread/INFO]: Connecting to localhost, 25565
+[11:38:25] [Render thread/INFO]: Connecting to localhost, 25565
+[11:38:30] [Render thread/INFO]: Published LAN server on port 46237
+[11:38:43] [Render thread/INFO]: Connecting to 127.0.0.1, 40895
+[11:39:15] [Render thread/INFO]: Connecting to 127.0.0.1, 40895
+[11:39:17] [Test thread/INFO]: [STDOUT]: Vanilla server evidence: /home/marc/.t3/worktrees/journal-sync/t3-9aed45aa/build/vanilla-test-runs/server-11528397163053844902
+[11:39:22] [Test thread/INFO]: [STDOUT]: Ticket 09: LAN host and unmodified vanilla server load/edit/save/reconnect assertions passed
