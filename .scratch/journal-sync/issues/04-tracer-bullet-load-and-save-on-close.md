@@ -27,6 +27,8 @@
 
 This machine has no `Xvfb` (`xvfb-run` missing); installing `xorg-server-xvfb xorg-xauth` via `sudo -A pacman` was not approved when attempted. The game test results above were produced by running the unchanged Gradle task with a throwaway `xvfb-run` shim (outside the repo) that just runs the game on the existing display (`:0`, Xwayland), so a game window appeared on the desktop during the run. Nothing in the repo depends on the shim. Install the packages from the README for true headless runs.
 
+True headless run: after merging to `main` (7895e17), CI ran the same `./gradlew runProductionClientGameTest` under real Xvfb and passed — https://github.com/Crambeary/journal-sync/actions/runs/39428553312. A local install of the packages on 2026-10-20 failed because the package database was stale (mirrors 404 the old build); it needs a `pacman -Syu` first.
+
 ## Manual check (for Marc)
 
 1. `./gradlew build` (JDK 25), then copy `build/libs/journal-sync-0.1.0.jar` into `/home/marc/.local/share/PrismLauncher/instances/26.2/minecraft/mods/` (next to Fabric API and Book Copy).
