@@ -40,3 +40,10 @@ retained. `backupAndLockErrors` asserts visible errors and cleanup for filesyste
 Conflict tests assert backups and all outcomes; Escape asserts no stale sidecar.
 
 Integration evidence and final validation: `docs/evidence/integration-07-08/verification.md`.
+
+
+## Final integration with ticket 05
+
+Codec/cap integration is resolved; original backup, binding, config, keybind,
+conflict, LAN and vanilla-server contracts remain covered. Final combined
+validation and retained human checks: `docs/evidence/final-integration/verification.md`.

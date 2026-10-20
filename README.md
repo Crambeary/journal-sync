@@ -61,3 +61,19 @@ The resolved path and backup policy are retained for the open binding. A `.lock`
 exists while bound; stale locks do not block loading. Done saves; Escape discards journal
 edits as vanilla does. Conflicts offer keep book (with backup), keep file, or a conflict
 copy; Enter and Escape in the prompt safely choose a copy.
+
+## Markdown pages and Obsidian
+
+Page boundaries use `\n<!-- page -->\n`. This exact sequence is reserved as a
+page separator; inline comments are ordinary text. Existing boundaries and empty
+pages are preserved. Marker-less notes and oversized pages are split at Minecraft's
+1024 UTF-16-unit page limit without dropping whitespace or splitting Unicode
+surrogate pairs. Loading does not modify the file; saving inserts markers at the
+new boundaries, and later loads keep those boundaries stable. Frontmatter is
+ordinary text (including `mc-sync: true`); it is never parsed or rewritten.
+
+More than 100 pages refuses the sync with an in-game warning and leaves the file
+unchanged. Invalid UTF-8 is refused rather than replaced with corrupted text.
+
+The optional [Obsidian CSS snippet](docs/obsidian/README.md) adds editing-view
+dividers. Its install guide includes the manual Reading view check.

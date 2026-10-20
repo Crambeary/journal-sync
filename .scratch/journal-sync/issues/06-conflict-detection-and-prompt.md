@@ -33,7 +33,7 @@ Evidence: `docs/evidence/06-conflict-prompt/validation.txt`, the two JUnit XML r
 ## Integration and remaining human checks
 
 - Integrated ticket 07: the single backup-aware `write` path handles both normal saves and `KEEP_BOOK`; discard, ordinary close/failure and conflict completion release the sidecar. Exact external-byte backup and lock cleanup are asserted by core and real-client integration tests. See `docs/evidence/integration-07-08/verification.md`.
-- Ticket 05 should share its codec between normal saves and conflict-copy serialization (`join` here). Hash raw file bytes, not normalized text, to retain CRLF/frontmatter conflict detection.
+- Ticket 05 integrated: normal/copy/book-backup serialization shares `join`; every save overload validates before writes. Raw-byte hashes retain CRLF/frontmatter conflict detection, including after a refused over-cap reload. See `docs/evidence/final-integration/verification.md`.
 - Integrated ticket 08: feedback distinguishes `Failed`, `Conflict`, `KeptFile`, `SavedAsConflictCopy` and `Saved`. Real-client assertions retain safe initial focus, Enter, prompt Escape and book Escape behavior. Both test path properties remain available.
-- No ticket-06 implementation checkbox remains. The spec's overall real Prism/LAN/user-server smoke test remains a human release check; this run does not claim it. After parallel tickets merge, the coordinator should rebase and rerun both gates.
+- No ticket-06 implementation checkbox remains. The spec's overall real Prism/LAN/user-server smoke test remains a human release check; this run does not claim it. The combined final gate is recorded in `docs/evidence/final-integration/verification.md`.
 - Recovered core behavior/tests from prior commit `08fc386` and reviewed/copied the prior uncommitted client work; the old worktree was left untouched. Added explicit default focus, safe prompt removal, and full client scenarios here.

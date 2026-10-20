@@ -1,0 +1,8 @@
+[11:58:59] [Server thread/INFO]: Starting minecraft server version 26.2
+[11:58:59] [Server thread/INFO]: Starting Minecraft server on 127.0.0.1:46643
+[11:59:00] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[11:59:01] [Server thread/INFO]: Player111 joined the game
+[11:59:02] [Server thread/INFO]: Player111 has the following entity data: {components: {"minecraft:writable_book_content": {pages: [{raw: "Multiplayer journal. Saved on server."}, {raw: "Second page preserved."}]}}, count: 1, id: "minecraft:writable_book"}
+[11:59:32] [Server thread/INFO]: Player111 joined the game
+[11:59:32] [Server thread/INFO]: Stopping server
+[11:59:37] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved

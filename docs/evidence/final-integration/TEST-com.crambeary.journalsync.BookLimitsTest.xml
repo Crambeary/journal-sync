@@ -1,0 +1,5 @@
+<testsuite name="com.crambeary.journalsync.BookLimitsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:57:32.533Z" hostname="bagend" time="8.064">
+  <testcase name="writableBookPageHoldsOneThousandTwentyFourCharacters()" classname="com.crambeary.journalsync.BookLimitsTest" time="0.015" />
+  <testcase name="writableBookHasOneHundredPages()" classname="com.crambeary.journalsync.BookLimitsTest" time="0.0" />
+  <testcase name="bookContentRefusesMoreThanTheMaximumPages()" classname="com.crambeary.journalsync.BookLimitsTest" time="0.002" />
+</testsuite>

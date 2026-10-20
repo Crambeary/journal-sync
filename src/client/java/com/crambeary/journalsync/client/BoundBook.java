@@ -159,6 +159,8 @@ public final class BoundBook {
 	private static void report(Path file, Journal.SaveOutcome outcome) {
 		JournalStatus.show(JournalFeedback.saved(outcome, file));
 		switch (outcome) {
+			case Journal.SaveOutcome.OverCap overCap ->
+				LOGGER.warn("Journal save refused: {} pages exceeds {}", overCap.pageCount(), overCap.maxPages());
 			case Journal.SaveOutcome.Failed failed ->
 				LOGGER.error("Could not save the journal to {}: {}", file, failed.reason());
 			case Journal.SaveOutcome.SavedAsConflictCopy copied ->

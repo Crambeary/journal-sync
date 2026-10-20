@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 import java.util.Objects;
 
 import com.crambeary.journalsync.client.BoundBook;
@@ -91,10 +92,12 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 		configuredBackupsAndBinding(context, server, connection, name, journal);
 		backupAndLockErrors(context, server, connection, journal);
 		unboundBookLeavesJournalUntouched(context, server, connection, name, journal);
+		markerlessNoteLoadsAndSavesLosslessly(context, server, connection, name, journal);
+		overCapLoadLeavesBookAndFileUntouched(context, server, connection, name, journal);
 		escapeDiscardsBoundEdits(context, server, connection, name, journal);
 		conflictsOfferAllResolutions(context, server, connection, name, journal);
 		List<String> saved = journalLoadsAndSavesOnClose(context, server, connection, name, journal);
-		System.out.println("Integration 07/08: " + name + " config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed");
+		System.out.println("Integration 05–09: " + name + " lossless pagination, cap/refused reload, config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed");
 		return saved;
 	}
 
@@ -464,6 +467,90 @@ public class JournalSyncClientGameTest implements FabricClientGameTest {
 			return paths.filter(path -> path.getFileName().toString().startsWith("journal.conflict-"))
 				.sorted().toList();
 		}
+	}
+
+	/** A long marker-less note survives the actual editor and its close handler, including empty pages. */
+	private static void markerlessNoteLoadsAndSavesLosslessly(
+		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
+		throws IOException {
+		String original = "---\nmc-sync: true\n---\n" + "x".repeat(WritableBookContent.PAGE_EDIT_LENGTH) + "🐻\n\n";
+		Files.writeString(journal, original, StandardCharsets.UTF_8);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		List<String> pages = List.copyOf(screen.pages);
+		assertEquals(name + ": paginated book preserves all text", original, String.join("", pages));
+		assertTrue(name + ": long note gains pages", pages.size() > 1);
+		assertTrue(name + ": pages fit component limit", pages.stream()
+			.allMatch(page -> page.length() <= WritableBookContent.PAGE_EDIT_LENGTH));
+		clickDone(context, connection);
+		String saved = Files.readString(journal);
+		assertEquals(name + ": first save inserts markers only", String.join(PAGE_MARKER, pages), saved);
+		assertEquals(name + ": paginated pages reach server", pages, serverBookPages(server));
+
+		// Explicit empty pages at both ends must survive the editor's Done event as well.
+		String withEmptyPages = PAGE_MARKER + saved + PAGE_MARKER + PAGE_MARKER;
+		Files.writeString(journal, withEmptyPages, StandardCharsets.UTF_8);
+		screen = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		assertEquals(name + ": leading empty page", "", screen.pages.getFirst());
+		assertEquals(name + ": trailing empty page", "", screen.pages.getLast());
+		clickDone(context, connection);
+		assertEquals(name + ": empty pages and stable markers survive Done", withEmptyPages, Files.readString(journal));
+	}
+
+	/** Scenario 4: a refused 120-page file must neither bind the screen nor replace its text. */
+	private static void overCapLoadLeavesBookAndFileUntouched(
+		ClientGameTestContext context, TestServerContext server, TestServerConnection connection, String name, Path journal)
+		throws IOException {
+		String overCap = String.join(PAGE_MARKER, Collections.nCopies(120, "Keep every page."));
+		Files.writeString(journal, overCap, StandardCharsets.UTF_8);
+		FileTime modifiedBefore = Files.getLastModifiedTime(journal);
+		BookEditScreen screen = openBookTheRealWay(context, server, connection);
+		context.getInput().typeChars("Original book text.");
+		context.waitTick();
+		context.clickScreenButton("journal_sync.button.journal");
+		context.waitTick();
+		assertTrue(name + ": cap refusal must leave screen unbound", !BoundBook.isBound(screen));
+		assertEquals(name + ": cap refusal preserves book", List.of("Original book text."), List.copyOf(screen.pages));
+		assertFeedback(context, "120 pages; limit 100");
+		assertTrue("refused load creates no lock", !Files.exists(Journal.lockPath(journal)));
+		// Allow the toast's entrance animation to finish before capturing the visible warning.
+		for (int tick = 0; tick < 30; tick++) {
+			context.waitTick();
+		}
+		context.takeScreenshot(name + "-120-page-cap-warning");
+		assertEquals(name + ": refused load preserves bytes", overCap, Files.readString(journal));
+		assertEquals(name + ": refused load preserves modified time", modifiedBefore, Files.getLastModifiedTime(journal));
+		clickDone(context, connection);
+		assertEquals(name + ": refused book close preserves bytes", overCap, Files.readString(journal));
+		assertEquals(name + ": refused book close preserves modified time", modifiedBefore, Files.getLastModifiedTime(journal));
+		assertEquals(name + ": original book still saved by vanilla", List.of("Original book text."), serverBookPages(server));
+
+		// Refusing a reload must retain the old hash and binding, so Done still detects the edit.
+		Files.writeString(journal, NOTE);
+		screen = openBookTheRealWay(context, server, connection);
+		context.clickScreenButton("journal_sync.button.journal");
+		var lockTime = Files.getLastModifiedTime(Journal.lockPath(journal));
+		var backupsBefore = backupContents(journal.getParent().resolve("game/journal-sync-backups"));
+		Files.writeString(journal, overCap);
+		modifiedBefore = Files.getLastModifiedTime(journal);
+		context.getInput().pressKey(JournalSyncClient.journalKey);
+		assertFeedback(context, "120 pages; limit 100");
+		assertTrue("refused reload retains binding", BoundBook.isBound(screen));
+		assertEquals("refused reload retains pages", NOTE_PAGES, List.copyOf(screen.pages));
+		assertEquals("refused reload retains lock", lockTime, Files.getLastModifiedTime(Journal.lockPath(journal)));
+		assertEquals("refused reload creates no backup", backupsBefore,
+			backupContents(journal.getParent().resolve("game/journal-sync-backups")));
+		clickDone(context, connection);
+		context.waitForScreen(ConflictScreen.class);
+		context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+		context.waitFor(mc -> mc.gui.screen() == null);
+		assertEquals("close after refused reload preserves external file", overCap, Files.readString(journal));
+		assertEquals("close after refused reload preserves file time", modifiedBefore, Files.getLastModifiedTime(journal));
+		assertTrue("close after refused reload removes lock", !Files.exists(Journal.lockPath(journal)));
+
 	}
 
 	private static BookEditScreen openBookTheRealWay(

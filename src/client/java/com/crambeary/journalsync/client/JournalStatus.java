@@ -12,7 +12,7 @@ public final class JournalStatus {
 
 	public static void show(JournalFeedback feedback) {
 		Minecraft client = Minecraft.getInstance();
-		Component message = Component.translatable(feedback.translationKey());
+		Component message = Component.translatable(feedback.translationKey(), feedback.pageCount(), feedback.maxPages());
 		SystemToast.addOrUpdate(client.gui.toastManager(), TOAST, Component.literal("Journal Sync"), message);
 		// Chat preserves the full path/reason after the toast disappears.
 		client.gui.hud.getChat().addClientSystemMessage(Component.literal("[Journal Sync] ").append(message)

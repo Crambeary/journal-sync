@@ -1,0 +1,7 @@
+<testsuite name="com.crambeary.journalsync.JournalConfigTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:57:40.598Z" hostname="bagend" time="0.045">
+  <testcase name="malformedAndInvalidSettingsAreReportedWithoutReplacingConfig()" classname="com.crambeary.journalsync.JournalConfigTest" time="0.025" />
+  <testcase name="missingConfigCreatesDefaultsAndUsesGlobalPath()" classname="com.crambeary.journalsync.JournalConfigTest" time="0.002" />
+  <testcase name="missingJournalFeedbackPreservesBookAndCreatesOnlyOnSave()" classname="com.crambeary.journalsync.JournalConfigTest" time="0.01" />
+  <testcase name="unreadableJournalProducesFeedbackWithoutChangingFiles()" classname="com.crambeary.journalsync.JournalConfigTest" time="0.002" />
+  <testcase name="templatesAndOverrideResolveThroughCore()" classname="com.crambeary.journalsync.JournalConfigTest" time="0.001" />
+</testsuite>

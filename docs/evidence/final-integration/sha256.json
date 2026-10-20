@@ -1,0 +1,16 @@
+{
+  "0000_singleplayer-rebound-key-loaded.png": "df4387b884daecceac6623ae9d20ff63257e2e203fba8fdc471e2ef114a6f6f0",
+  "0002_singleplayer-unreadable-error.png": "2c06aaeba4ee5056dbb6658d05ce413a790f7fcb6b09de846e6e09d73fb6ed52",
+  "0008_singleplayer-120-page-cap-warning.png": "c3e3ab0f31870514df28110af4b4df85c9bdfb2cdeafdf80409c1a674f1c11f1",
+  "0009_singleplayer-conflict-default.png": "7b5a6cb371b788bddea893895de5eefbaa07acec543b5dc76faf0e743e079c8f",
+  "0023_dedicated-server-120-page-cap-warning.png": "a8a9b6bb4223a947ccacb7ff635ee4d2dcf6fc0ed8c1516d1a7d2edd5360df74",
+  "0030_09-lan-host-loaded.png": "dad94da057fce93d51359cee3a405500e90c38ef20c7001000dda016e95b487f",
+  "0034_09-vanilla-server-reconnected.png": "921ed26a765c3ae422fffaa34457d20ad319bbbc387f473851d85705aeb4ed14",
+  "TEST-com.crambeary.journalsync.BookLimitsTest.xml": "8c9e72588e6c4e788d0640d1bd26209b0d7a85054b9578b9ddf6510b3d9881ed",
+  "TEST-com.crambeary.journalsync.JournalConfigTest.xml": "78ce8cc2107d3583cac533d1063a23bc8f8d276c355a3f2ec33cb271058f1414",
+  "TEST-com.crambeary.journalsync.JournalIntegrationTest.xml": "6428e0cdf8e152a94a502f854d8853568cc235169a56814eed382462add2dd7a",
+  "TEST-com.crambeary.journalsync.JournalTest.xml": "2c5f68f102f36f395456fcdeef94196191cb794f3cafdbe21d0446d2348ea091",
+  "validation.txt": "d605aa9e129721d0df2a79a36d108cbd52bb27871ad47db4380f2b41d9f0e446",
+  "vanilla-server-summary.txt": "ee95c7a765b87315f40d0f94c35bab15ec536daf349224c2bfba61dad2253f13",
+  "verification.md": "4b56eaeb25c10ef61888646d14b0413c9a496b72a418a244180e55296332c992"
+}

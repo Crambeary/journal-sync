@@ -1,0 +1,17 @@
+Initial complete integration gate (exit 0):
+[11:56:03] [Test thread/INFO]: [STDOUT]: Integration 05–09: singleplayer lossless pagination, cap/refused reload, config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed
+[11:56:30] [Test thread/INFO]: [STDOUT]: Integration 05–09: dedicated-server lossless pagination, cap/refused reload, config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed
+[11:57:27] [Test thread/INFO]: [STDOUT]: Ticket 09: LAN host and unmodified vanilla server load/edit/save/reconnect assertions passed
+BUILD SUCCESSFUL in 2m 12s
+16 actionable tasks: 11 executed, 5 up-to-date
+
+Final complete gate, structured localized feedback (exit 0):
+[11:58:10] [Render thread/INFO]: [System] [CHAT] [Journal Sync] Journal has 120 pages; limit 100. Sync refused; file unchanged. — /tmp/journal-sync-gametest2415249314895429868/journal.md
+[11:58:12] [Render thread/INFO]: [System] [CHAT] [Journal Sync] Journal has 120 pages; limit 100. Sync refused; file unchanged. — /tmp/journal-sync-gametest2415249314895429868/journal.md
+[11:58:15] [Test thread/INFO]: [STDOUT]: Integration 05–09: singleplayer lossless pagination, cap/refused reload, config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed
+[11:58:35] [Render thread/INFO]: [System] [CHAT] [Journal Sync] Journal has 120 pages; limit 100. Sync refused; file unchanged. — /tmp/journal-sync-gametest2415249314895429868/journal.md
+[11:58:37] [Render thread/INFO]: [System] [CHAT] [Journal Sync] Journal has 120 pages; limit 100. Sync refused; file unchanged. — /tmp/journal-sync-gametest2415249314895429868/journal.md
+[11:58:41] [Test thread/INFO]: [STDOUT]: Integration 05–09: dedicated-server lossless pagination, cap/refused reload, config/count/binding, backup/lock errors, keybind, missing-file, conflicts and Escape assertions passed
+[11:59:38] [Test thread/INFO]: [STDOUT]: Ticket 09: LAN host and unmodified vanilla server load/edit/save/reconnect assertions passed
+BUILD SUCCESSFUL in 2m 9s
+16 actionable tasks: 9 executed, 7 up-to-date

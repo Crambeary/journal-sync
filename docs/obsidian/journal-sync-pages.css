@@ -1,0 +1,12 @@
+/* Journal Sync page dividers, scoped to notes with cssclasses: journal-sync.
+ * CodeMirror gives HTML comments cm-comment spans, but no attribute containing
+ * their source text. CSS alone cannot select just the text <!-- page -->, so
+ * standalone HTML comment lines in these notes share the divider styling.
+ * Only the editing view is selected; no reading-view content is generated.
+ */
+.markdown-source-view.mod-cm6.journal-sync .cm-line:has(> .cm-comment) {
+  border-block-start: 1px solid var(--background-modifier-border);
+}
+.markdown-source-view.mod-cm6.journal-sync .cm-line > .cm-comment {
+  color: var(--text-muted);
+}

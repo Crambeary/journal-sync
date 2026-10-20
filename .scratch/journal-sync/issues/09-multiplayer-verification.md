@@ -46,3 +46,10 @@ Both game-test entrypoints and the Mojang server task remain registered. The com
 integration reruns the original Fabric dedicated-server reconnect, real vanilla-server
 reconnect and published LAN-host assertions with config, feedback, backups and sidecar
 lifecycle installed. Current evidence: `docs/evidence/integration-07-08/verification.md`.
+
+
+## Final integration with ticket 05
+
+Codec/cap integration is resolved; original backup, binding, config, keybind,
+conflict, LAN and vanilla-server contracts remain covered. Final combined
+validation and retained human checks: `docs/evidence/final-integration/verification.md`.

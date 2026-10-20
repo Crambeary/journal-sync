@@ -1,0 +1,10 @@
+<testsuite name="com.crambeary.journalsync.JournalIntegrationTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-20T15:57:40.644Z" hostname="bagend" time="0.084">
+  <testcase name="capFeedbackRefusesFreshLoadAndReloadWithoutBackupOrLockChanges()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.009" />
+  <testcase name="everySaveOverloadValidatesBeforeBackupOverwriteOrConflictCopy()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.003" />
+  <testcase name="backupFailurePreventsNormalAndKeepBookOverwrite()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.002" />
+  <testcase name="missingFileLoadsOnceWithBackupAndLockThenCreatesOnSave()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.002" />
+  <testcase name="keepBookBacksUpExactExternalBytesButOtherChoicesPreserveBytesAndTime()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.003" />
+  <testcase name="normalCopyAndPriorBookBackupUseSameLosslessEncoding()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.003" />
+  <testcase name="backupLockAndReadFailuresMapToLoadFailureAndRejectedReloadKeepsLock()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.003" />
+  <testcase name="parsedCountRotatesBothLoadAndSaveBackups()" classname="com.crambeary.journalsync.JournalIntegrationTest" time="0.055" />
+</testsuite>
