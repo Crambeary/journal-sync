@@ -6,7 +6,8 @@
 	"environment": "*",
 	"entrypoints": {
 		"fabric-client-gametest": [
-			"com.crambeary.journalsync.JournalSyncClientGameTest"
+			"com.crambeary.journalsync.JournalSyncClientGameTest",
+			"com.crambeary.journalsync.MultiplayerJournalGameTest"
 		]
 	}
 }
