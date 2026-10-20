@@ -4,14 +4,14 @@
 
 **Blocked by:** 02 — Walking skeleton + test-harness spike.
 
-**Status:** awaiting-manual-check — only the real single-player world check is left (see "Manual check" below)
+**Status:** done
 
 - [x] Core load/save interface exists and is covered by Fabric Loader JUnit tests through its public interface only — `Journal.load(Path)` → `Loaded(pages, LoadToken)` and `Journal.save(Path, pages, token)` → `SaveOutcome` (`src/main/java/com/crambeary/journalsync/Journal.java`); 10 tests in `JournalTest` (bootstraps Minecraft), all green in `./gradlew build`
 - [x] Simple round trip works: a multi-page note with `<!-- page -->` markers loads into the book page-for-page and saves back unchanged — `JournalTest.aMultiPageNoteSavesBackUnchanged` (frontmatter, an empty page, unicode, trailing newline) plus the game test's byte-for-byte file assertion
 - [x] Client game test (scenario 1): open book and quill, press Journal → book pages match the file (screenshot) — game test asserts the screen's pages equal the three pages of the file; `docs/evidence/04-tracer-bullet/0001_singleplayer-journal-loaded.png` (and `0004_dedicated-server-journal-loaded.png`)
 - [x] Client game test (scenario 2): type text, close → file contains the edited text — game test types after the loaded text, clicks Done, asserts the file bytes; `docs/evidence/04-tracer-bullet/0002_singleplayer-journal-edited.png`
 - [x] Client game test: open and close a book without pressing Journal → file untouched — game test asserts the file's bytes and modified time are unchanged and that vanilla still saved the typed text to the server-side book; `0000_singleplayer-unbound-book.png`
-- [ ] Works in the user's real single-player world (quick manual check noted in this ticket) — **not doable by the agent**, see "Manual check" below
+- [x] Works in the user's real single-player world (quick manual check noted in this ticket) — Marc confirmed 2026-10-20 in the Prism 26.2 instance: multi-page load (including an empty page) and save on Done round-trip through `journal.md`; a book never bound to the journal left the file untouched. See "Manual check result" below
 - [x] Client game test opens the book the real way (`give` a book and quill, then use the item), not via `setScreen`, so the server holds the item the edit packet refers to; close, reconnect, and the server-side item has the saved pages — `give @a writable_book` then a right click; after Done the server-side `WRITABLE_BOOK_CONTENT` is asserted, then the singleplayer world is reopened and the dedicated server reconnected and the pages asserted again
 - [x] Prism mod set: the production client game test also runs once with the jars from the Prism 26.2 instance's `mods/` folder (Book Copy, Fabric API) alongside this mod, and passes — `./gradlew runProductionClientGameTest -PprismModsDir=/home/marc/.local/share/PrismLauncher/instances/26.2/minecraft/mods` → BUILD SUCCESSFUL; loaded `bookcopy 0.2.0-26.2` and `fabric-api 0.161.0+26.2`; screenshots in `docs/evidence/04-tracer-bullet/prism-mods/`
 
@@ -45,3 +45,25 @@ True headless run: after merging to `main` (7895e17), CI ran the same `./gradlew
 4. Type some words on page 1, click **Done**. Open `journal.md`: it should have your words on the first page, the `<!-- page -->` line unchanged, and page 2 unchanged. Reopen the book in game: the saved text is in it.
 5. Untouched check: note the file's modified time (`stat journal.md`), `/give @s writable_book` a second book, open it, type something, press **Done** without pressing Journal. The file and its modified time must not change.
 6. Tick the box above if all of that held.
+
+## Manual check result (2026-10-20)
+
+Marc ran the check in the Prism 26.2 instance (`journal-sync-0.1.0.jar` + Fabric API; Book Copy disabled). All steps held. File after the run:
+
+```
+Hi, I missed it.
+
+<!-- page -->
+
+I saw this
+
+<!-- page -->
+
+<!-- page -->
+Empty is my name.
+```
+
+Observed during the check, for later tickets:
+
+- The first press loaded a missing file as an empty journal and **blanked the book's existing text with no warning**; closing then created an empty `journal.md`. Nothing in tickets 05–10 guards this yet.
+- There is no in-game sign that a book is bound or that a save happened (ticket 08).
